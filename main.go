@@ -199,10 +199,6 @@ func getAvg(list []float64) float64 {
 	return a / float64(len(list))
 }
 
-func color(i int) string {
-	return fmt.Sprintf("\u001B[%dm", i)
-}
-
 func newCpuChart(ctx context.Context) ([]container.Option, error) {
 
 	xLabels := formatLabels(func(n int) string {
@@ -254,10 +250,8 @@ func newCpuChart(ctx context.Context) ([]container.Option, error) {
 		return err
 	})
 
-	//title := fmt.Sprintf("%sCPU (%smin%s, %savg%s, %smax%s)", color(37), color(89), color(37), color(87), color(37), color(88), color(37))
-
 	opts := []container.Option{container.Border(linestyle.Light),
-		container.BorderTitle(" CPU (min, avg, max) "),
+		container.BorderTitle(" CPU (%) (min, avg, max) "),
 		container.PlaceWidget(lc)}
 
 	return opts, nil
@@ -298,8 +292,8 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 		}
 		iostat := findNetworkDevice(iostats, "en0")
 
-		newSent := iostat.BytesSent / 1024
-		newRecv := iostat.BytesRecv / 1024
+		newSent := iostat.BytesSent * uint64(time.Second/sampleInterval) / 1024
+		newRecv := iostat.BytesRecv * uint64(time.Second/sampleInterval) / 1024
 
 		if lastSent != 0 {
 			sent.AddValue(float64(newSent - lastSent))
@@ -326,7 +320,7 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 	})
 
 	opts := []container.Option{container.Border(linestyle.Light),
-		container.BorderTitle(" Network IO (send, recv) "),
+		container.BorderTitle(" Network IO (KiB/s) (send, recv) "),
 		container.PlaceWidget(lc)}
 
 	return opts, nil
@@ -362,8 +356,8 @@ func newDiskChart(ctx context.Context) ([]container.Option, error) {
 			iostat = v
 		}
 
-		newWrite := iostat.ReadBytes / 1024
-		newRead := iostat.WriteBytes / 1024
+		newWrite := iostat.ReadBytes * uint64(time.Second/sampleInterval) / 1024
+		newRead := iostat.WriteBytes * uint64(time.Second/sampleInterval) / 1024
 
 		if lastWrite != 0 {
 			write.AddValue(float64(newWrite - lastWrite))
@@ -390,7 +384,7 @@ func newDiskChart(ctx context.Context) ([]container.Option, error) {
 	})
 
 	opts := []container.Option{container.Border(linestyle.Light),
-		container.BorderTitle(" Disk IO (read, write) "),
+		container.BorderTitle(" Disk IO (KiB/s) (read, write) "),
 		container.PlaceWidget(lc)}
 
 	return opts, nil

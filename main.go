@@ -18,10 +18,10 @@ import (
 	"github.com/mum4k/termdash/terminal/termbox"
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgets/linechart"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/load"
-	"github.com/shirou/gopsutil/net"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/load"
+	"github.com/shirou/gopsutil/v3/net"
 )
 
 // redrawInterval is how often termdash redraws the screen.
@@ -257,13 +257,22 @@ func newCpuChart(ctx context.Context) ([]container.Option, error) {
 	return opts, nil
 }
 
-func findNetworkDevice(iostat []net.IOCountersStat, device string) net.IOCountersStat {
+func findNetworkDevice(iostat []net.IOCountersStat) net.IOCountersStat {
+	var maxBytesReceived uint64 = 0
+	var stat net.IOCountersStat
+
 	for _, st := range iostat {
-		if st.Name == device {
-			return st
+		if st.BytesRecv > maxBytesReceived {
+			maxBytesReceived = st.BytesRecv
+			stat = st
 		}
 	}
-	panic(fmt.Sprintf("Could not find device %s", device))
+
+	if maxBytesReceived == 0 {
+		panic(fmt.Sprintf("Could not find network device"))
+	}
+
+	return stat
 }
 
 func newNetChart(ctx context.Context) ([]container.Option, error) {
@@ -280,8 +289,10 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	sent := NewBoundedSeries(sampleWindow)
-	recv := NewBoundedSeries(sampleWindow)
+
+	device := ""
+	var sent *BoundedSeries
+	var recv *BoundedSeries
 	var lastSent uint64
 	var lastRecv uint64
 
@@ -290,7 +301,15 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 		if err != nil {
 			return err
 		}
-		iostat := findNetworkDevice(iostats, "en0")
+		iostat := findNetworkDevice(iostats)
+
+		if iostat.Name != device {
+			sent = NewBoundedSeries(sampleWindow)
+			recv = NewBoundedSeries(sampleWindow)
+			lastSent = 0
+			lastRecv = 0
+			device = iostat.Name
+		}
 
 		newSent := iostat.BytesSent * uint64(time.Second/sampleInterval) / 1024
 		newRecv := iostat.BytesRecv * uint64(time.Second/sampleInterval) / 1024

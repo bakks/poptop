@@ -31,14 +31,7 @@ const redrawInterval = 2000 * time.Millisecond
 const sampleInterval = 500 * time.Millisecond
 const sampleWindow = 240
 
-// widgets holds the widgets used by this demo.
-type widgets struct {
-	loadChart   []container.Option
-	cpuChart    []container.Option
-	netChart    []container.Option
-	diskChart   []container.Option
-	topCpuChart []container.Option
-}
+type Widgets [][]container.Option
 
 type BoundedSeries struct {
 	values    []float64
@@ -75,40 +68,52 @@ func (this *BoundedSeries) Values() []float64 {
 	return this.values
 }
 
-// newWidgets creates all widgets used by this demo.
-func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Container) (*widgets, error) {
-	loadChart, err := newLoadChart(ctx)
-	if err != nil {
-		return nil, err
+// newWidgets initializes widgets in the configured order and passes them back as []container.Option`s
+func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Container, config *PoptopConfig) (Widgets, error) {
+	var topCpu []container.Option
+	var topMem []container.Option
+	var err error
+	widgets := [][]container.Option{}
+
+	for _, widgetRef := range config.Widgets {
+		var newWidget []container.Option
+
+		switch widgetRef {
+		case WidgetCPULoad:
+			newWidget, err = newLoadChart(ctx)
+
+		case WidgetCPUPerc:
+			newWidget, err = newCpuChart(ctx)
+
+		case WidgetNetworkIO:
+			newWidget, err = newNetChart(ctx)
+
+		case WidgetDiskIOPS:
+			newWidget, err = newDiskChart(ctx)
+
+		case WidgetTopCPU:
+			if topCpu == nil {
+				topCpu, topMem, err = newTopBoxes(ctx)
+			}
+			newWidget = topCpu
+
+		case WidgetTopMem:
+			if topCpu == nil {
+				topCpu, topMem, err = newTopBoxes(ctx)
+			}
+			newWidget = topMem
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		if newWidget == nil {
+			panic(fmt.Sprintf("Failed to initialize widget %d", widgetRef))
+		}
+		widgets = append(widgets, newWidget)
 	}
 
-	cpuChart, err := newCpuChart(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	netChart, err := newNetChart(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	diskChart, err := newDiskChart(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	topCpu, err := newTopCpuBox(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &widgets{
-		loadChart:   loadChart,
-		cpuChart:    cpuChart,
-		netChart:    netChart,
-		diskChart:   diskChart,
-		topCpuChart: topCpu,
-	}, nil
+	return widgets, nil
 }
 
 func formatLabels(xIndexToLabel func(n int) string) map[int]string {
@@ -121,35 +126,54 @@ func formatLabels(xIndexToLabel func(n int) string) map[int]string {
 	return labels
 }
 
-func newTopCpuBox(ctx context.Context) ([]container.Option, error) {
-	textBox, err := text.New()
+// Initializes both a top CPU and top memory box
+// We do these together because they depend on the same call to `ps`
+func newTopBoxes(ctx context.Context) ([]container.Option, []container.Option, error) {
+	cpuTextBox, err := text.New()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	memTextBox, err := text.New()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	go periodic(ctx, redrawInterval/2, func() error {
-		procs, _ := topProcesses(ctx)
+		topCpu, topMem := topProcesses(ctx)
 		if err != nil {
 			return err
 		}
 
 		lines := []string{}
-		for _, proc := range procs {
+		for _, proc := range topCpu {
 			lineItem := fmt.Sprintf("%3.0f%%  %-5d  %s\n", proc.CpuPerc, proc.Pid, proc.Command)
 			lines = append(lines, lineItem)
 		}
 
 		fullText := strings.Join(lines, "")
-		textBox.Write(fullText, text.WriteReplace())
+		cpuTextBox.Write(fullText, text.WriteReplace())
+
+		lines = []string{}
+		for _, proc := range topMem {
+			lineItem := fmt.Sprintf("%3.0f%%  %-5d  %s\n", proc.MemPerc, proc.Pid, proc.Command)
+			lines = append(lines, lineItem)
+		}
+
+		fullText = strings.Join(lines, "")
+		memTextBox.Write(fullText, text.WriteReplace())
 
 		return nil
 	})
 
-	opts := []container.Option{container.Border(linestyle.Light),
+	cpuOpts := []container.Option{container.Border(linestyle.Light),
 		container.BorderTitle(" Top CPU Processes (%, pid, command) "),
-		container.PlaceWidget(textBox)}
+		container.PlaceWidget(cpuTextBox)}
 
-	return opts, nil
+	memOpts := []container.Option{container.Border(linestyle.Light),
+		container.BorderTitle(" Top CPU Processes (%, pid, command) "),
+		container.PlaceWidget(memTextBox)}
+
+	return cpuOpts, memOpts, nil
 }
 
 func newLoadChart(ctx context.Context) ([]container.Option, error) {
@@ -449,28 +473,60 @@ func newDiskChart(ctx context.Context) ([]container.Option, error) {
 	return opts, nil
 }
 
-// layout prepares container options that represent the desired screen layout.
-// This function demonstrates the use of the grid builder.
-// layout() and contLayout() demonstrate the two available layout APIs and
-// both produce equivalent layouts for layoutType layoutAll.
-func layout(w *widgets) ([]container.Option, error) {
-	opts := []container.Option{
-		container.SplitHorizontal(
-			container.Top(
-				container.SplitHorizontal(
-					container.Top(w.loadChart...),
-					container.Bottom(w.cpuChart...),
-				),
-			),
-			container.Bottom(
-				container.SplitHorizontal(
-					container.Top(w.netChart...),
-					container.Bottom(w.topCpuChart...),
-				),
-			),
-		),
+// returns the first power of 2 greater than the input
+func nextPower2(i int) int {
+	n := 1
+	for n < i {
+		n = n << 1
 	}
-	return opts, nil
+	return n
+}
+
+// Recursively creates a layout by nesting widgets into SplitHorizontals
+// The rangeA and rangeB arguments represent the start and end of the
+// area of the widget slice in which we're operating. These are split
+// into chunks based on dividing powers of two.
+//
+// For example, if len(widgets) == 5, the following calls will be made:
+//   layoutR(widgets, 0, 7)
+//   layoutR(widgets, 0, 3)
+//   layoutR(widgets, 0, 1)
+//   layoutR(widgets, 2, 3)
+//   layoutR(widgets, 4, 7)
+//   layoutR(widgets, 4, 5)
+func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
+	if rangeA+1 == rangeB {
+		if rangeB >= len(widgets) {
+			return widgets[rangeA]
+		}
+
+		return []container.Option{
+			container.SplitHorizontal(
+				container.Top(widgets[rangeA]...),
+				container.Bottom(widgets[rangeB]...))}
+	}
+
+	rangeAa := rangeA
+	rangeAb := (rangeB-rangeA+1)/2 + rangeA - 1
+	rangeBa := rangeAb + 1
+	rangeBb := rangeB
+
+	widgetA := layoutR(widgets, rangeAa, rangeAb)
+	if rangeBa >= len(widgets) {
+		return widgetA
+	}
+
+	widgetB := layoutR(widgets, rangeBa, rangeBb)
+	return []container.Option{
+		container.SplitHorizontal(
+			container.Top(widgetA...),
+			container.Bottom(widgetB...))}
+}
+
+// Takes an array of widgets as [][]container.Option and returns a termdash
+// layout based on configuration.
+func layout(widgets Widgets) ([]container.Option, error) {
+	return layoutR(widgets, 0, nextPower2(len(widgets))-1), nil
 }
 
 // rootID is the ID assigned to the root container.
@@ -581,7 +637,41 @@ func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
 	return procsByCpu, procsByMem
 }
 
+const (
+	WidgetCPULoad = iota
+	WidgetCPUPerc
+	WidgetNetworkIO
+	WidgetDiskIOPS
+	WidgetTopCPU
+	WidgetTopMem
+)
+
+type PoptopConfig struct {
+	// Which widgets (boxes of info) we want to display
+	// The order here signifies the order in which widgets will be placed
+	Widgets []int
+
+	// How frequently we want to redraw the entire terminal
+	RedrawInterval time.Duration
+
+	// How frequently we want to sample (e.g. get current CPU load)
+	SampleInterval time.Duration
+
+	// How many samples we want to retain and draw before rolling them off
+	SampleWindow int
+}
+
+func DefaultConfig() *PoptopConfig {
+	return &PoptopConfig{
+		Widgets:        []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
+		RedrawInterval: 2000 * time.Millisecond,
+		SampleInterval: 500 * time.Millisecond,
+		SampleWindow:   240,
+	}
+}
+
 func main() {
+	config := DefaultConfig()
 	var t terminalapi.Terminal
 	var err error
 
@@ -599,12 +689,12 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	w, err := newWidgets(ctx, t, cont)
+	w, err := newWidgets(ctx, t, cont, config)
 	if err != nil {
 		panic(err)
 	}
 
-	gridOpts, err := layout(w) // equivalent to contLayout(w)
+	gridOpts, err := layout(w)
 	if err != nil {
 		panic(err)
 	}

@@ -26,11 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
-// redrawInterval is how often termdash redraws the screen.
-const redrawInterval = 2000 * time.Millisecond
-const sampleInterval = 500 * time.Millisecond
-const sampleWindow = 240
-
 type Widgets [][]container.Option
 
 type BoundedSeries struct {
@@ -80,26 +75,26 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 
 		switch widgetRef {
 		case WidgetCPULoad:
-			newWidget, err = newLoadChart(ctx)
+			newWidget, err = newLoadChart(ctx, config)
 
 		case WidgetCPUPerc:
-			newWidget, err = newCpuChart(ctx)
+			newWidget, err = newCpuChart(ctx, config)
 
 		case WidgetNetworkIO:
-			newWidget, err = newNetChart(ctx)
+			newWidget, err = newNetChart(ctx, config)
 
 		case WidgetDiskIOPS:
-			newWidget, err = newDiskChart(ctx)
+			newWidget, err = newDiskChart(ctx, config)
 
 		case WidgetTopCPU:
 			if topCpu == nil {
-				topCpu, topMem, err = newTopBoxes(ctx)
+				topCpu, topMem, err = newTopBoxes(ctx, config)
 			}
 			newWidget = topCpu
 
 		case WidgetTopMem:
 			if topCpu == nil {
-				topCpu, topMem, err = newTopBoxes(ctx)
+				topCpu, topMem, err = newTopBoxes(ctx, config)
 			}
 			newWidget = topMem
 		}
@@ -116,10 +111,10 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 	return widgets, nil
 }
 
-func formatLabels(xIndexToLabel func(n int) string) map[int]string {
+func formatLabels(config *PoptopConfig, xIndexToLabel func(n int) string) map[int]string {
 	labels := map[int]string{}
 
-	for i := 0; i < sampleWindow; i++ {
+	for i := 0; i < config.NumSamples; i++ {
 		labels[i] = xIndexToLabel(i)
 	}
 
@@ -128,7 +123,7 @@ func formatLabels(xIndexToLabel func(n int) string) map[int]string {
 
 // Initializes both a top CPU and top memory box
 // We do these together because they depend on the same call to `ps`
-func newTopBoxes(ctx context.Context) ([]container.Option, []container.Option, error) {
+func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option, []container.Option, error) {
 	cpuTextBox, err := text.New()
 	if err != nil {
 		return nil, nil, err
@@ -138,7 +133,7 @@ func newTopBoxes(ctx context.Context) ([]container.Option, []container.Option, e
 		return nil, nil, err
 	}
 
-	go periodic(ctx, redrawInterval/2, func() error {
+	go periodic(ctx, config.SampleInterval, func() error {
 		topCpu, topMem := topProcesses(ctx)
 		if err != nil {
 			return err
@@ -176,10 +171,10 @@ func newTopBoxes(ctx context.Context) ([]container.Option, []container.Option, e
 	return cpuOpts, memOpts, nil
 }
 
-func newLoadChart(ctx context.Context) ([]container.Option, error) {
+func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 
-	xLabels := formatLabels(func(n int) string {
-		x := float64(n) * float64(sampleInterval) / float64(time.Second)
+	xLabels := formatLabels(config, func(n int) string {
+		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
 	})
 
@@ -190,11 +185,12 @@ func newLoadChart(ctx context.Context) ([]container.Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	load1 := NewBoundedSeries(sampleWindow)
-	load5 := NewBoundedSeries(sampleWindow)
-	load15 := NewBoundedSeries(sampleWindow)
+	nSamples := config.NumSamples
+	load1 := NewBoundedSeries(nSamples)
+	load5 := NewBoundedSeries(nSamples)
+	load15 := NewBoundedSeries(nSamples)
 
-	go periodic(ctx, redrawInterval/2, func() error {
+	go periodic(ctx, config.SampleInterval, func() error {
 		loadAvg, err := load.AvgWithContext(ctx)
 		if err != nil {
 			return err
@@ -263,10 +259,10 @@ func getAvg(list []float64) float64 {
 	return a / float64(len(list))
 }
 
-func newCpuChart(ctx context.Context) ([]container.Option, error) {
+func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 
-	xLabels := formatLabels(func(n int) string {
-		x := float64(n) * float64(sampleInterval) / float64(time.Second)
+	xLabels := formatLabels(config, func(n int) string {
+		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
 	})
 
@@ -277,12 +273,14 @@ func newCpuChart(ctx context.Context) ([]container.Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	avgCpu := NewBoundedSeries(sampleWindow)
-	minCpu := NewBoundedSeries(sampleWindow)
-	maxCpu := NewBoundedSeries(sampleWindow)
 
-	go periodic(ctx, redrawInterval/2, func() error {
-		cpuAllPerc, err := cpu.PercentWithContext(ctx, sampleInterval, true)
+	nSamples := config.NumSamples
+	avgCpu := NewBoundedSeries(nSamples)
+	minCpu := NewBoundedSeries(nSamples)
+	maxCpu := NewBoundedSeries(nSamples)
+
+	go periodic(ctx, config.SampleInterval, func() error {
+		cpuAllPerc, err := cpu.PercentWithContext(ctx, config.SampleInterval, true)
 		if err != nil {
 			return err
 		}
@@ -321,6 +319,7 @@ func newCpuChart(ctx context.Context) ([]container.Option, error) {
 	return opts, nil
 }
 
+// Identify the network device with the most inbound data (since startup) based on iostat output
 func findNetworkDevice(iostat []net.IOCountersStat) net.IOCountersStat {
 	var maxBytesReceived uint64 = 0
 	var stat net.IOCountersStat
@@ -339,10 +338,10 @@ func findNetworkDevice(iostat []net.IOCountersStat) net.IOCountersStat {
 	return stat
 }
 
-func newNetChart(ctx context.Context) ([]container.Option, error) {
+func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 
-	xLabels := formatLabels(func(n int) string {
-		x := float64(n) * float64(sampleInterval) / float64(time.Second)
+	xLabels := formatLabels(config, func(n int) string {
+		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
 	})
 
@@ -360,7 +359,7 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 	var lastSent uint64
 	var lastRecv uint64
 
-	go periodic(ctx, redrawInterval/2, func() error {
+	go periodic(ctx, config.SampleInterval, func() error {
 		iostats, err := net.IOCountersWithContext(ctx, true)
 		if err != nil {
 			return err
@@ -368,15 +367,17 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 		iostat := findNetworkDevice(iostats)
 
 		if iostat.Name != device {
-			sent = NewBoundedSeries(sampleWindow)
-			recv = NewBoundedSeries(sampleWindow)
+			// This happens at startup OR if a different network device has become the most active
+			nSamples := config.NumSamples
+			sent = NewBoundedSeries(nSamples)
+			recv = NewBoundedSeries(nSamples)
 			lastSent = 0
 			lastRecv = 0
 			device = iostat.Name
 		}
 
-		newSent := iostat.BytesSent * uint64(time.Second/sampleInterval) / 1024
-		newRecv := iostat.BytesRecv * uint64(time.Second/sampleInterval) / 1024
+		newSent := iostat.BytesSent * uint64(time.Second/config.SampleInterval) / 1024
+		newRecv := iostat.BytesRecv * uint64(time.Second/config.SampleInterval) / 1024
 
 		if lastSent != 0 {
 			sent.AddValue(float64(newSent - lastSent))
@@ -409,10 +410,10 @@ func newNetChart(ctx context.Context) ([]container.Option, error) {
 	return opts, nil
 }
 
-func newDiskChart(ctx context.Context) ([]container.Option, error) {
+func newDiskChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 
-	xLabels := formatLabels(func(n int) string {
-		x := float64(n) * float64(sampleInterval) / float64(time.Second)
+	xLabels := formatLabels(config, func(n int) string {
+		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
 	})
 
@@ -423,12 +424,12 @@ func newDiskChart(ctx context.Context) ([]container.Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	write := NewBoundedSeries(sampleWindow)
-	read := NewBoundedSeries(sampleWindow)
+	write := NewBoundedSeries(config.NumSamples)
+	read := NewBoundedSeries(config.NumSamples)
 	var lastWrite uint64
 	var lastRead uint64
 
-	go periodic(ctx, redrawInterval/2, func() error {
+	go periodic(ctx, config.SampleInterval, func() error {
 		iostats, err := disk.IOCountersWithContext(ctx)
 		if err != nil {
 			return err
@@ -439,8 +440,8 @@ func newDiskChart(ctx context.Context) ([]container.Option, error) {
 			iostat = v
 		}
 
-		newWrite := iostat.ReadBytes * uint64(time.Second/sampleInterval) / 1024
-		newRead := iostat.WriteBytes * uint64(time.Second/sampleInterval) / 1024
+		newWrite := iostat.ReadBytes * uint64(time.Second/config.SampleInterval) / 1024
+		newRead := iostat.WriteBytes * uint64(time.Second/config.SampleInterval) / 1024
 
 		if lastWrite != 0 {
 			write.AddValue(float64(newWrite - lastWrite))
@@ -657,8 +658,11 @@ type PoptopConfig struct {
 	// How frequently we want to sample (e.g. get current CPU load)
 	SampleInterval time.Duration
 
-	// How many samples we want to retain and draw before rolling them off
-	SampleWindow int
+	// How long to collect data before rolling over (i.e. width of chart x axis in time)
+	ChartDuration time.Duration
+
+	// How many samples will we retain (not set, but calculated using SampleInterval and ChartDuration
+	NumSamples int
 }
 
 func DefaultConfig() *PoptopConfig {
@@ -666,12 +670,19 @@ func DefaultConfig() *PoptopConfig {
 		Widgets:        []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
 		RedrawInterval: 2000 * time.Millisecond,
 		SampleInterval: 500 * time.Millisecond,
-		SampleWindow:   240,
+		ChartDuration:  120 * time.Second,
 	}
+}
+
+func (this *PoptopConfig) finalize() {
+	this.NumSamples = int(math.Ceil(float64(this.ChartDuration) / float64(this.SampleInterval)))
 }
 
 func main() {
 	config := DefaultConfig()
+	// TODO parse config flags before finalizing
+	config.finalize()
+
 	var t terminalapi.Terminal
 	var err error
 
@@ -709,7 +720,7 @@ func main() {
 		}
 	}
 
-	err = termdash.Run(ctx, t, cont, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(redrawInterval))
+	err = termdash.Run(ctx, t, cont, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(config.RedrawInterval))
 	if err != nil {
 		panic(err)
 	}

@@ -1,23 +1,25 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"flag"
 	"fmt"
-	"log"
-	"time"
-
 	"math"
+	"os/exec"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/keyboard"
 	"github.com/mum4k/termdash/linestyle"
-	"github.com/mum4k/termdash/terminal/tcell"
 	"github.com/mum4k/termdash/terminal/termbox"
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgets/linechart"
+	"github.com/mum4k/termdash/widgets/text"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/load"
@@ -31,10 +33,11 @@ const sampleWindow = 240
 
 // widgets holds the widgets used by this demo.
 type widgets struct {
-	loadChart []container.Option
-	cpuChart  []container.Option
-	netChart  []container.Option
-	diskChart []container.Option
+	loadChart   []container.Option
+	cpuChart    []container.Option
+	netChart    []container.Option
+	diskChart   []container.Option
+	topCpuChart []container.Option
 }
 
 type BoundedSeries struct {
@@ -94,11 +97,17 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 		return nil, err
 	}
 
+	topCpu, err := newTopCpuBox(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &widgets{
-		loadChart: loadChart,
-		cpuChart:  cpuChart,
-		netChart:  netChart,
-		diskChart: diskChart,
+		loadChart:   loadChart,
+		cpuChart:    cpuChart,
+		netChart:    netChart,
+		diskChart:   diskChart,
+		topCpuChart: topCpu,
 	}, nil
 }
 
@@ -110,6 +119,37 @@ func formatLabels(xIndexToLabel func(n int) string) map[int]string {
 	}
 
 	return labels
+}
+
+func newTopCpuBox(ctx context.Context) ([]container.Option, error) {
+	textBox, err := text.New()
+	if err != nil {
+		return nil, err
+	}
+
+	go periodic(ctx, redrawInterval/2, func() error {
+		procs, _ := topProcesses(ctx)
+		if err != nil {
+			return err
+		}
+
+		lines := []string{}
+		for _, proc := range procs {
+			lineItem := fmt.Sprintf("%3.0f%%  %-5d  %s\n", proc.CpuPerc, proc.Pid, proc.Command)
+			lines = append(lines, lineItem)
+		}
+
+		fullText := strings.Join(lines, "")
+		textBox.Write(fullText, text.WriteReplace())
+
+		return nil
+	})
+
+	opts := []container.Option{container.Border(linestyle.Light),
+		container.BorderTitle(" Top CPU Processes (%, pid, command) "),
+		container.PlaceWidget(textBox)}
+
+	return opts, nil
 }
 
 func newLoadChart(ctx context.Context) ([]container.Option, error) {
@@ -425,7 +465,7 @@ func layout(w *widgets) ([]container.Option, error) {
 			container.Bottom(
 				container.SplitHorizontal(
 					container.Top(w.netChart...),
-					container.Bottom(w.diskChart...),
+					container.Bottom(w.topCpuChart...),
 				),
 			),
 		),
@@ -442,25 +482,111 @@ const (
 	tcellTerminal   = "tcell"
 )
 
+func commandWithContext(ctx context.Context, name string, arg ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, arg...)
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	if err := cmd.Start(); err != nil {
+		return buf.Bytes(), err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return buf.Bytes(), err
+	}
+
+	return buf.Bytes(), nil
+}
+
+type PsProcess struct {
+	User    string
+	Pid     int
+	CpuPerc float64
+	MemPerc float64
+	Command string
+}
+
+func GetPsProcesses(ctx context.Context) ([]*PsProcess, error) {
+	args := []string{"auxc"}
+	out, err := commandWithContext(ctx, "ps", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(out), "\n")
+	processes := []*PsProcess{}
+
+	for _, line := range lines[1:] {
+		fields := strings.Fields(line)
+		if len(fields) < 10 {
+			break
+		}
+
+		cmd := strings.Join(fields[10:], " ")
+		pid, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return nil, err
+		}
+
+		cpuPerc, err := strconv.ParseFloat(fields[2], 64)
+		if err != nil {
+			return nil, err
+		}
+
+		memPerc, err := strconv.ParseFloat(fields[3], 64)
+		if err != nil {
+			return nil, err
+		}
+
+		process := &PsProcess{
+			User:    fields[0],
+			Pid:     pid,
+			CpuPerc: cpuPerc,
+			MemPerc: memPerc,
+			Command: cmd,
+		}
+
+		processes = append(processes, process)
+	}
+
+	return processes, nil
+}
+
+func (this *PsProcess) String() string {
+	return fmt.Sprintf("%s,%d,%f,%f,%s\n", this.User, this.Pid, this.CpuPerc, this.MemPerc, this.Command)
+}
+
+func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
+	procs, err := GetPsProcesses(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	sort.Slice(procs, func(i, j int) bool {
+		return procs[i].CpuPerc > procs[j].CpuPerc
+	})
+
+	procsByCpu := make([]*PsProcess, 10)
+	copy(procsByCpu, procs)
+
+	sort.Slice(procs, func(i, j int) bool {
+		return procs[i].MemPerc > procs[j].MemPerc
+	})
+
+	procsByMem := make([]*PsProcess, 10)
+	copy(procsByMem, procs)
+
+	return procsByCpu, procsByMem
+}
+
 func main() {
-
-	terminalPtr := flag.String("terminal",
-		"tcell",
-		"The terminal implementation to use. Available implementations are 'termbox' and 'tcell' (default = tcell).")
-	flag.Parse()
-
 	var t terminalapi.Terminal
 	var err error
 
-	switch terminal := *terminalPtr; terminal {
-	case termboxTerminal:
-		t, err = termbox.New(termbox.ColorMode(terminalapi.ColorMode256))
-	case tcellTerminal:
-		t, err = tcell.New(tcell.ColorMode(terminalapi.ColorMode256))
-	default:
-		log.Fatalf("Unknown terminal implementation '%s' specified. Please choose between 'termbox' and 'tcell'.", terminal)
-		return
-	}
+	t, err = termbox.New(termbox.ColorMode(terminalapi.ColorMode256))
+	//t, err = tcell.New(tcell.ColorMode(terminalapi.ColorMode256))
 
 	if err != nil {
 		panic(err)

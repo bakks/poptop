@@ -165,7 +165,7 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		container.PlaceWidget(cpuTextBox)}
 
 	memOpts := []container.Option{container.Border(linestyle.Light),
-		container.BorderTitle(" Top CPU Processes (%, pid, command) "),
+		container.BorderTitle(" Top Memory Processes (%, pid, command) "),
 		container.PlaceWidget(memTextBox)}
 
 	return cpuOpts, memOpts, nil
@@ -565,6 +565,13 @@ type PsProcess struct {
 	Command string
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func GetPsProcesses(ctx context.Context) ([]*PsProcess, error) {
 	args := []string{"auxc"}
 	out, err := commandWithContext(ctx, "ps", args...)
@@ -616,6 +623,7 @@ func (this *PsProcess) String() string {
 }
 
 func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
+	const numRowsShown int = 20
 	procs, err := GetPsProcesses(ctx)
 	if err != nil {
 		panic(err)
@@ -625,14 +633,14 @@ func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
 		return procs[i].CpuPerc > procs[j].CpuPerc
 	})
 
-	procsByCpu := make([]*PsProcess, 10)
+	procsByCpu := make([]*PsProcess, min(numRowsShown, len(procs)))
 	copy(procsByCpu, procs)
 
 	sort.Slice(procs, func(i, j int) bool {
 		return procs[i].MemPerc > procs[j].MemPerc
 	})
 
-	procsByMem := make([]*PsProcess, 10)
+	procsByMem := make([]*PsProcess, min(numRowsShown, len(procs)))
 	copy(procsByMem, procs)
 
 	return procsByCpu, procsByMem

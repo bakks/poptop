@@ -529,6 +529,11 @@ func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
 // Takes an array of widgets as [][]container.Option and returns a termdash
 // layout based on configuration.
 func layout(widgets Widgets) ([]container.Option, error) {
+	if len(widgets) == 0 {
+		return nil, fmt.Errorf("No widgets initialized, failing.")
+	} else if len(widgets) == 1 {
+		return widgets[0], nil
+	}
 	return layoutR(widgets, 0, nextPower2(len(widgets))-1), nil
 }
 
@@ -673,15 +678,33 @@ type PoptopConfig struct {
 
 	// How many samples will we retain (not set, but calculated using SampleInterval and ChartDuration
 	NumSamples int
+
+	// If we receive any flags for specific widgets we switch into a mode where we only show the specificed widgets
+	SelectWidgetsMode bool
 }
 
 var cli struct {
-	RedrawInterval int `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
-	SampleInterval int `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
-	ChartDuration  int `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+	RedrawInterval int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
+	SampleInterval int  `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
+	ChartDuration  int  `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+	CpuLoad        bool `short:"L" help:"Add CPU Load chart to layout" default:"false"`
+	CpuPercent     bool `short:"C" help:"Add CPU % chart to layout" default:"false"`
+	DiskIops       bool `short:"D" help:"Add Disk IOPS chart to layout" default:"false"`
+	NetworkIo      bool `short:"N" help:"Add Network IO chart to layout" default:"false"`
+	TopCpu         bool `short:"T" help:"Add Top Processes by CPU list to layout" default:"false"`
+	TopMemory      bool `short:"M" help:"Add Top Processes by Memory list to layout" default:"false"`
 }
 
-func (this *PoptopConfig) applyFlags() error {
+func (this *PoptopConfig) selectWidget(widget int) {
+	if !this.SelectWidgetsMode {
+		this.SelectWidgetsMode = true
+		this.Widgets = []int{}
+	}
+
+	this.Widgets = append(this.Widgets, widget)
+}
+
+func (this *PoptopConfig) ApplyFlags() error {
 	if cli.RedrawInterval < 50 {
 		return fmt.Errorf("You've set the redraw interval to %dms, this is likely to stress the system so we error out for values less than 50. The redraw-interval flag is in milliseconds.\n", cli.RedrawInterval)
 	}
@@ -693,16 +716,42 @@ func (this *PoptopConfig) applyFlags() error {
 	this.SampleInterval = time.Duration(cli.SampleInterval) * time.Millisecond
 
 	this.ChartDuration = time.Duration(cli.ChartDuration) * time.Second
+
+	if cli.CpuLoad {
+		this.selectWidget(WidgetCPULoad)
+	}
+
+	if cli.CpuPercent {
+		this.selectWidget(WidgetCPUPerc)
+	}
+
+	if cli.DiskIops {
+		this.selectWidget(WidgetDiskIOPS)
+	}
+
+	if cli.NetworkIo {
+		this.selectWidget(WidgetNetworkIO)
+	}
+
+	if cli.TopCpu {
+		this.selectWidget(WidgetTopCPU)
+	}
+
+	if cli.TopMemory {
+		this.selectWidget(WidgetTopMem)
+	}
 	return nil
 }
 
 func DefaultConfig() *PoptopConfig {
 	return &PoptopConfig{
-		Widgets: []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
+		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
+		SelectWidgetsMode: false,
 	}
 }
 
-func (this *PoptopConfig) finalize() {
+func (this *PoptopConfig) Finalize() {
+	// Calculate the number of samples we'll retain by dividing the chart duration by the sampling interval
 	this.NumSamples = int(math.Ceil(float64(this.ChartDuration) / float64(this.SampleInterval)))
 }
 
@@ -710,14 +759,14 @@ func main() {
 	var err error
 	config := DefaultConfig()
 	kong.Parse(&cli)
-	err = config.applyFlags()
+	err = config.ApplyFlags()
 
 	if err != nil {
 		fmt.Print(err.Error())
 		os.Exit(1)
 	}
 
-	config.finalize()
+	config.Finalize()
 
 	var terminal terminalapi.Terminal
 

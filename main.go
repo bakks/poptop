@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -675,14 +676,22 @@ type PoptopConfig struct {
 }
 
 var cli struct {
-	RedrawInterval int `help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
-	SampleInterval int `help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
-	ChartDuration  int `help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+	RedrawInterval int `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
+	SampleInterval int `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
+	ChartDuration  int `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
 }
 
 func (this *PoptopConfig) applyFlags() error {
+	if cli.RedrawInterval < 50 {
+		return fmt.Errorf("You've set the redraw interval to %dms, this is likely to stress the system so we error out for values less than 50. The redraw-interval flag is in milliseconds.\n", cli.RedrawInterval)
+	}
 	this.RedrawInterval = time.Duration(cli.RedrawInterval) * time.Millisecond
+
+	if cli.SampleInterval < 20 {
+		return fmt.Errorf("You've set the sample interval to %dms, this is likely to stress the system so we error out for values less than 20. The sample-interval flag is in milliseconds.\n", cli.SampleInterval)
+	}
 	this.SampleInterval = time.Duration(cli.SampleInterval) * time.Millisecond
+
 	this.ChartDuration = time.Duration(cli.ChartDuration) * time.Second
 	return nil
 }
@@ -698,29 +707,35 @@ func (this *PoptopConfig) finalize() {
 }
 
 func main() {
+	var err error
 	config := DefaultConfig()
 	kong.Parse(&cli)
-	config.applyFlags()
+	err = config.applyFlags()
+
+	if err != nil {
+		fmt.Print(err.Error())
+		os.Exit(1)
+	}
+
 	config.finalize()
 
-	var t terminalapi.Terminal
-	var err error
+	var terminal terminalapi.Terminal
 
-	t, err = termbox.New(termbox.ColorMode(terminalapi.ColorMode256))
+	terminal, err = termbox.New(termbox.ColorMode(terminalapi.ColorMode256))
 	//t, err = tcell.New(tcell.ColorMode(terminalapi.ColorMode256))
 
 	if err != nil {
 		panic(err)
 	}
-	defer t.Close()
+	defer terminal.Close()
 
-	cont, err := container.New(t, container.ID(rootID))
+	cont, err := container.New(terminal, container.ID(rootID))
 	if err != nil {
 		panic(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	w, err := newWidgets(ctx, t, cont, config)
+	w, err := newWidgets(ctx, terminal, cont, config)
 	if err != nil {
 		panic(err)
 	}
@@ -740,7 +755,7 @@ func main() {
 		}
 	}
 
-	err = termdash.Run(ctx, t, cont, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(config.RedrawInterval))
+	err = termdash.Run(ctx, terminal, cont, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(config.RedrawInterval))
 	if err != nil {
 		panic(err)
 	}

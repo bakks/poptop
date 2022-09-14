@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
@@ -673,12 +674,22 @@ type PoptopConfig struct {
 	NumSamples int
 }
 
+var cli struct {
+	RedrawInterval int `help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
+	SampleInterval int `help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
+	ChartDuration  int `help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+}
+
+func (this *PoptopConfig) applyFlags() error {
+	this.RedrawInterval = time.Duration(cli.RedrawInterval) * time.Millisecond
+	this.SampleInterval = time.Duration(cli.SampleInterval) * time.Millisecond
+	this.ChartDuration = time.Duration(cli.ChartDuration) * time.Second
+	return nil
+}
+
 func DefaultConfig() *PoptopConfig {
 	return &PoptopConfig{
-		Widgets:        []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
-		RedrawInterval: 2000 * time.Millisecond,
-		SampleInterval: 500 * time.Millisecond,
-		ChartDuration:  120 * time.Second,
+		Widgets: []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
 	}
 }
 
@@ -688,7 +699,8 @@ func (this *PoptopConfig) finalize() {
 
 func main() {
 	config := DefaultConfig()
-	// TODO parse config flags before finalizing
+	kong.Parse(&cli)
+	config.applyFlags()
 	config.finalize()
 
 	var t terminalapi.Terminal

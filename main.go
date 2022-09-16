@@ -176,6 +176,18 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	return cpuOpts, memOpts, nil
 }
 
+func formatOnePoint(n float64) string {
+	return fmt.Sprintf("%.1f", n)
+}
+
+func formatNoPoint(n float64) string {
+	return fmt.Sprintf("%.0f", n)
+}
+
+func formatPercent(n float64) string {
+	return fmt.Sprintf("%.0f%%", n)
+}
+
 func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
@@ -185,6 +197,7 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 	lc, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+		linechart.YAxisFormattedValues(formatOnePoint),
 	)
 	if err != nil {
 		return nil, err
@@ -273,6 +286,7 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	lc, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+		linechart.YAxisFormattedValues(formatPercent),
 	)
 	if err != nil {
 		return nil, err
@@ -352,6 +366,7 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	lc, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+		linechart.YAxisFormattedValues(formatNoPoint),
 	)
 	if err != nil {
 		return nil, err
@@ -423,6 +438,7 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 	lc, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+		linechart.YAxisFormattedValues(formatNoPoint),
 	)
 	if err != nil {
 		return nil, err
@@ -486,6 +502,7 @@ func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Opti
 	lc, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+		linechart.YAxisFormattedValues(formatNoPoint),
 	)
 	if err != nil {
 		return nil, err

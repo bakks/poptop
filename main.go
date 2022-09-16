@@ -86,7 +86,10 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 			newWidget, err = newNetChart(ctx, config)
 
 		case WidgetDiskIOPS:
-			newWidget, err = newDiskChart(ctx, config)
+			newWidget, err = newDiskIOPSChart(ctx, config)
+
+		case WidgetDiskIO:
+			newWidget, err = newDiskIOChart(ctx, config)
 
 		case WidgetTopCPU:
 			if topCpu == nil {
@@ -174,7 +177,6 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 }
 
 func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
-
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
@@ -412,8 +414,7 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	return opts, nil
 }
 
-func newDiskChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
-
+func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
@@ -442,8 +443,71 @@ func newDiskChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 			iostat = v
 		}
 
-		newWrite := iostat.ReadBytes * uint64(time.Second/config.SampleInterval) / 1024
-		newRead := iostat.WriteBytes * uint64(time.Second/config.SampleInterval) / 1024
+		newRead := iostat.ReadCount
+		newWrite := iostat.WriteCount
+
+		if lastWrite != 0 {
+			write.AddValue(float64(newWrite-lastWrite) * float64(time.Second/config.SampleInterval))
+		}
+		lastWrite = newWrite
+
+		if lastRead != 0 {
+			read.AddValue(float64(newRead-lastRead) * float64(time.Second/config.SampleInterval))
+		}
+		lastRead = newRead
+
+		err = lc.Series("c_write", write.Values(),
+			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+			linechart.SeriesXLabels(xLabels),
+		)
+		if err != nil {
+			return err
+		}
+		err = lc.Series("b_read", read.Values(),
+			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+			linechart.SeriesXLabels(xLabels),
+		)
+		return err
+	})
+
+	opts := []container.Option{container.Border(linestyle.Light),
+		container.BorderTitle(" Disk IOPS (read, write) "),
+		container.PlaceWidget(lc)}
+
+	return opts, nil
+}
+
+func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
+	xLabels := formatLabels(config, func(n int) string {
+		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
+		return fmt.Sprintf("%.0fs", x)
+	})
+
+	lc, err := linechart.New(
+		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
+		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	write := NewBoundedSeries(config.NumSamples)
+	read := NewBoundedSeries(config.NumSamples)
+	var lastWrite uint64
+	var lastRead uint64
+
+	go periodic(ctx, config.SampleInterval, func() error {
+		iostats, err := disk.IOCountersWithContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		var iostat disk.IOCountersStat
+		for _, v := range iostats {
+			iostat = v
+		}
+
+		newRead := iostat.ReadBytes * uint64(time.Second/config.SampleInterval) / 1024
+		newWrite := iostat.WriteBytes * uint64(time.Second/config.SampleInterval) / 1024
 
 		if lastWrite != 0 {
 			write.AddValue(float64(newWrite - lastWrite))
@@ -658,6 +722,7 @@ const (
 	WidgetCPUPerc
 	WidgetNetworkIO
 	WidgetDiskIOPS
+	WidgetDiskIO
 	WidgetTopCPU
 	WidgetTopMem
 )
@@ -690,6 +755,7 @@ var cli struct {
 	CpuLoad        bool `short:"L" help:"Add CPU Load chart to layout" default:"false"`
 	CpuPercent     bool `short:"C" help:"Add CPU % chart to layout" default:"false"`
 	DiskIops       bool `short:"D" help:"Add Disk IOPS chart to layout" default:"false"`
+	DiskIo         bool `short:"E" help:"Add Disk IO chart to layout" default:"false"`
 	NetworkIo      bool `short:"N" help:"Add Network IO chart to layout" default:"false"`
 	TopCpu         bool `short:"T" help:"Add Top Processes by CPU list to layout" default:"false"`
 	TopMemory      bool `short:"M" help:"Add Top Processes by Memory list to layout" default:"false"`
@@ -727,6 +793,10 @@ func (this *PoptopConfig) ApplyFlags() error {
 
 	if cli.DiskIops {
 		this.selectWidget(WidgetDiskIOPS)
+	}
+
+	if cli.DiskIo {
+		this.selectWidget(WidgetDiskIO)
 	}
 
 	if cli.NetworkIo {

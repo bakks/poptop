@@ -20,3 +20,5 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e // indirect
 )
+
+replace github.com/mum4k/termdash => ../termdash

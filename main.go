@@ -236,8 +236,27 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 		return err
 	})
 
-	opts := []container.Option{container.Border(linestyle.Light),
-		container.BorderTitle(" CPU Load (1min, 5min, 15min) "),
+	title := cell.NewRichTextString(cell.ColorWhite).
+		AddText(" CPU Load (").
+		SetFgColor(cell.ColorNumber(87)).
+		AddText("1min").
+		ResetColor().
+		AddText(", ").
+		SetFgColor(cell.ColorNumber(93)).
+		AddText("5min").
+		ResetColor().
+		AddText(", ").
+		SetFgColor(cell.ColorNumber(124)).
+		AddText("15min").
+		ResetColor().
+		AddText(") ")
+
+	opts := []container.Option{container.Border(linestyle.Round),
+		container.BorderColor(cell.ColorGray),
+		container.FocusedColor(cell.ColorGray),
+		container.TitleColor(cell.ColorWhite),
+		container.TitleFocusedColor(cell.ColorWhite),
+		container.RichBorderTitle(title),
 		container.PlaceWidget(lc)}
 
 	return opts, nil

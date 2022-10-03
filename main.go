@@ -43,6 +43,39 @@ func max(a, b int) int {
 	return b
 }
 
+type minMax struct {
+	min float64
+	max float64
+}
+
+func getMinMax(list []float64) *minMax {
+	min := math.MaxFloat64
+	max := float64(-1)
+
+	for _, n := range list {
+		if n < min {
+			min = n
+		}
+		if n > max {
+			max = n
+		}
+	}
+
+	return &minMax{
+		min: min,
+		max: max,
+	}
+}
+
+func getAvg(list []float64) float64 {
+	a := float64(0)
+	for _, n := range list {
+		a += n
+	}
+
+	return a / float64(len(list))
+}
+
 type Widgets [][]container.Option
 
 // newWidgets initializes widgets in the configured order and passes them back as []container.Option`s
@@ -253,39 +286,6 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 	opts := makeContainer(lc, title)
 
 	return opts, nil
-}
-
-type minMax struct {
-	min float64
-	max float64
-}
-
-func getMinMax(list []float64) *minMax {
-	min := math.MaxFloat64
-	max := float64(-1)
-
-	for _, n := range list {
-		if n < min {
-			min = n
-		}
-		if n > max {
-			max = n
-		}
-	}
-
-	return &minMax{
-		min: min,
-		max: max,
-	}
-}
-
-func getAvg(list []float64) float64 {
-	a := float64(0)
-	for _, n := range list {
-		a += n
-	}
-
-	return a / float64(len(list))
 }
 
 func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
@@ -654,15 +654,6 @@ func layout(widgets Widgets) ([]container.Option, error) {
 	return layoutR(widgets, 0, nextPower2(len(widgets))-1), nil
 }
 
-// rootID is the ID assigned to the root container.
-const rootID = "root"
-
-// Terminal implementations
-const (
-	termboxTerminal = "termbox"
-	tcellTerminal   = "tcell"
-)
-
 func commandWithContext(ctx context.Context, name string, arg ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, arg...)
 
@@ -875,6 +866,9 @@ func (this *PoptopConfig) Finalize() {
 	// Calculate the number of samples we'll retain by dividing the chart duration by the sampling interval
 	this.NumSamples = int(math.Ceil(float64(this.ChartDuration) / float64(this.SampleInterval)))
 }
+
+// rootID is the ID assigned to the root container.
+const rootID = "root"
 
 func main() {
 	var err error

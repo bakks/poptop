@@ -29,42 +29,21 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 type Widgets [][]container.Option
-
-type BoundedSeries struct {
-	values    []float64
-	maxValues int
-	highWater int
-}
-
-func NewBoundedSeries(maxValues int) *BoundedSeries {
-	values := make([]float64, maxValues)
-	for i := 0; i < maxValues; i++ {
-		values[i] = math.NaN()
-	}
-	return &BoundedSeries{
-		values:    values,
-		maxValues: maxValues,
-		highWater: 0,
-	}
-}
-
-func (this *BoundedSeries) AddValue(v float64) {
-	if this.highWater < this.maxValues {
-		this.values[this.highWater] = v
-		this.highWater++
-	} else {
-		newValues := append(this.values, v)
-		if len(newValues) > this.maxValues {
-			newValues = newValues[len(newValues)-this.maxValues:]
-		}
-		this.values = newValues
-	}
-}
-
-func (this *BoundedSeries) Values() []float64 {
-	return this.values
-}
 
 // newWidgets initializes widgets in the configured order and passes them back as []container.Option`s
 func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Container, config *PoptopConfig) (Widgets, error) {
@@ -237,19 +216,19 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 		load5.AddValue(loadAvg.Load5)
 		load15.AddValue(loadAvg.Load15)
 
-		err = lc.Series("c_load1", load1.Values(),
+		err = lc.Series("c_load1", load1.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("b_load5", load5.Values(),
+		err = lc.Series("b_load5", load5.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(93))),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("a_load15", load15.Values(),
+		err = lc.Series("a_load15", load15.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(124))),
 			linechart.SeriesXLabels(xLabels),
 		)
@@ -338,21 +317,21 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		minCpu.AddValue(minMax.min)
 		maxCpu.AddValue(minMax.max)
 
-		err = lc.Series("c_cpuAvg", avgCpu.Values(),
+		err = lc.Series("c_cpuAvg", avgCpu.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(202))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("b_cpuMax", maxCpu.Values(),
+		err = lc.Series("b_cpuMax", maxCpu.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("a_cpuMin", minCpu.Values(),
+		err = lc.Series("a_cpuMin", minCpu.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
 			linechart.SeriesXLabels(xLabels),
 		)
@@ -446,14 +425,14 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		}
 		lastRecv = newRecv
 
-		err = lc.Series("c_sent", sent.Values(),
+		err = lc.Series("c_sent", sent.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("b_recv", recv.Values(),
+		err = lc.Series("b_recv", recv.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
 			linechart.SeriesXLabels(xLabels),
 		)
@@ -515,15 +494,15 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 		}
 		lastRead = newRead
 
-		err = lc.Series("c_write", write.Values(),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+		err = lc.Series("c_read", read.SmoothedValues(config.SmoothingSamples),
+			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("b_read", read.Values(),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+		err = lc.Series("b_write", write.SmoothedValues(config.SmoothingSamples),
+			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
@@ -584,14 +563,14 @@ func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Opti
 		}
 		lastRead = newRead
 
-		err = lc.Series("c_write", write.Values(),
+		err = lc.Series("c_write", write.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
-		err = lc.Series("b_read", read.Values(),
+		err = lc.Series("b_read", read.SmoothedValues(config.SmoothingSamples),
 			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
 			linechart.SeriesXLabels(xLabels),
 		)
@@ -710,13 +689,6 @@ type PsProcess struct {
 	Command string
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func GetPsProcesses(ctx context.Context) ([]*PsProcess, error) {
 	args := []string{"auxc"}
 	out, err := commandWithContext(ctx, "ps", args...)
@@ -818,6 +790,9 @@ type PoptopConfig struct {
 	// How many samples will we retain (not set, but calculated using SampleInterval and ChartDuration
 	NumSamples int
 
+	// How many samples will be averaged into a single datapoint
+	SmoothingSamples int
+
 	// If we receive any flags for specific widgets we switch into a mode where we only show the specificed widgets
 	SelectWidgetsMode bool
 }
@@ -826,6 +801,7 @@ var cli struct {
 	RedrawInterval int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
 	SampleInterval int  `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
 	ChartDuration  int  `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+	Smooth         int  `short:"a" help:"How many samples will be included in running average" default:"4"`
 	CpuLoad        bool `short:"L" help:"Add CPU Load chart to layout" default:"false"`
 	CpuPercent     bool `short:"C" help:"Add CPU % chart to layout" default:"false"`
 	DiskIops       bool `short:"D" help:"Add Disk IOPS chart to layout" default:"false"`
@@ -856,6 +832,7 @@ func (this *PoptopConfig) ApplyFlags() error {
 	this.SampleInterval = time.Duration(cli.SampleInterval) * time.Millisecond
 
 	this.ChartDuration = time.Duration(cli.ChartDuration) * time.Second
+	this.SmoothingSamples = cli.Smooth
 
 	if cli.CpuLoad {
 		this.selectWidget(WidgetCPULoad)

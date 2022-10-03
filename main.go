@@ -897,7 +897,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer terminal.Close()
 
 	cont, err := container.New(terminal, container.ID(rootID))
 	if err != nil {
@@ -920,8 +919,9 @@ func main() {
 	}
 
 	quitter := func(k *terminalapi.Keyboard) {
-		if k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC || k.String() == "q" {
+		if k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC || k.Key == 'q' {
 			cancel()
+			terminal.Close()
 		}
 	}
 

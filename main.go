@@ -789,6 +789,7 @@ type PoptopConfig struct {
 }
 
 var cli struct {
+	Help           bool `short:"h" help:"Show help information"`
 	RedrawInterval int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
 	SampleInterval int  `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
 	ChartDuration  int  `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
@@ -801,6 +802,10 @@ var cli struct {
 	TopCpu         bool `short:"T" help:"Add Top Processes by CPU list to layout" default:"false"`
 	TopMemory      bool `short:"M" help:"Add Top Processes by Memory list to layout" default:"false"`
 }
+
+const description string = "A modern top command that charts system metrics like CPU load, network IO, etc in the terminal."
+
+const helpContent string = `Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity.`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {
@@ -857,7 +862,7 @@ func (this *PoptopConfig) ApplyFlags() error {
 
 func DefaultConfig() *PoptopConfig {
 	return &PoptopConfig{
-		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS, WidgetTopCPU, WidgetTopMem},
+		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS},
 		SelectWidgetsMode: false,
 	}
 }
@@ -867,13 +872,21 @@ func (this *PoptopConfig) Finalize() {
 	this.NumSamples = int(math.Ceil(float64(this.ChartDuration) / float64(this.SampleInterval)))
 }
 
-// rootID is the ID assigned to the root container.
-const rootID = "root"
-
 func main() {
+	const rootID = "root"
 	var err error
+	ctx, cancel := context.WithCancel(context.Background())
+
 	config := DefaultConfig()
-	kong.Parse(&cli)
+	kongCtx := kong.Parse(&cli, kong.Name("poptop"), kong.Description(description), kong.UsageOnError(), kong.NoDefaultHelp())
+
+	if cli.Help {
+		kong.DefaultHelpPrinter(kong.HelpOptions{}, kongCtx)
+		fmt.Printf("\n\n")
+		fmt.Println(helpContent)
+		os.Exit(0)
+	}
+
 	err = config.ApplyFlags()
 
 	if err != nil {
@@ -897,7 +910,6 @@ func main() {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	w, err := newWidgets(ctx, terminal, cont, config)
 	if err != nil {
 		panic(err)

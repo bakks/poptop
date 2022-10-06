@@ -290,8 +290,7 @@ const helpContent string = `"What's going on with my local system?". Poptop turn
 
 By default, all charts will be stacked vertically. You can use the -z flag to stack them horizontally instead.
 
-You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built.
-`
+You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built.`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {

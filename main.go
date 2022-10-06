@@ -151,8 +151,11 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		return nil, nil, err
 	}
 
-	go periodic(ctx, config.SampleInterval, func() error {
-		topCpu, topMem := topProcesses(ctx)
+	// Sample top less frequently than configured for other charts because it's a point-in-time measure
+	interval := config.SampleInterval * 4
+
+	go periodic(ctx, interval, func() error {
+		topCpu, topMem := topProcesses(ctx, config)
 		if err != nil {
 			return err
 		}
@@ -223,6 +226,13 @@ func makeContainer(widget widgetapi.Widget, title *cell.RichTextString) []contai
 		container.PlaceWidget(widget)}
 }
 
+// Create a widget that shows CPU load measured at 1min, 5min, 15min averages.
+// This uses a sysctl call to find CPU load.
+//
+// Load is one of the simplest metrics for understanding how busy your system is.
+// It means roughly how many processes are executing or waiting to execute on a CPU.
+// If load is higher than the number of CPU cores on your system then it indicates
+// processes are having to wait for execution.
 func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
@@ -288,6 +298,10 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 	return opts, nil
 }
 
+// Create a chart to show min, average, max CPU busy % time.
+// On MacOS this calls host_processor_info().
+// The judgement call here is that min, avg, max is a simpler way to understand CPU load
+// rather than a single average, or charting per-CPU time.
 func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 
 	xLabels := formatLabels(config, func(n int) string {
@@ -377,8 +391,11 @@ func findNetworkDevice(iostat []net.IOCountersStat) net.IOCountersStat {
 	return stat
 }
 
+// Chart to show throughput on the selected network device in kibibytes per second
+// using data from the netstat command.
+// We automatically choose a network device based on which device has received the most
+// inbound data since system start, changing dynamically if this this switches to a new device.
 func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
-
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
 		return fmt.Sprintf("%.0fs", x)
@@ -455,6 +472,10 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	return opts, nil
 }
 
+// Chart to show Disk IOPS (input/output operations per second) over time using data from iostat.
+// Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than
+// throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database
+// operations), then disk throughput may be a better metric.
 func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
@@ -476,6 +497,7 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 			return err
 		}
 
+		// TODO logic for merging disk iostats
 		var iostat disk.IOCountersStat
 		for _, v := range iostats {
 			iostat = v
@@ -524,6 +546,7 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 	return opts, nil
 }
 
+// Chart to show disk IO throughput in kibibytes per second based on iostat output.
 func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
@@ -602,7 +625,9 @@ func nextPower2(i int) int {
 	return n
 }
 
-// Recursively creates a layout by nesting widgets into SplitHorizontals
+// Recursively creates a layout by nesting widgets into SplitHorizontals.
+// We operate on a slice of Widgets (sized to be a power of two) and recursively
+// call on a specific range of this slice.
 // The rangeA and rangeB arguments represent the start and end of the
 // area of the widget slice in which we're operating. These are split
 // into chunks based on dividing powers of two.
@@ -615,28 +640,38 @@ func nextPower2(i int) int {
 //   layoutR(widgets, 4, 7)
 //   layoutR(widgets, 4, 5)
 func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
-	if rangeA+1 == rangeB {
-		if rangeB >= len(widgets) {
+	if rangeA+1 == rangeB { // if the current range is two adjacent widgets
+		if rangeB >= len(widgets) { // if there's only a single widget in this range
+			// then wrap that widget and return
 			return widgets[rangeA]
 		}
 
+		// we have two widgets, so wrap in a SplitHorizontal and return
 		return []container.Option{
 			container.SplitHorizontal(
 				container.Top(widgets[rangeA]...),
 				container.Bottom(widgets[rangeB]...))}
 	}
 
+	// split the current range into two subranges on powers of two
+	// e.g. if A = 4, B = 7, then Aa = 4, Ab = 5, Ba = 6, Bb = 7
 	rangeAa := rangeA
 	rangeAb := (rangeB-rangeA+1)/2 + rangeA - 1
 	rangeBa := rangeAb + 1
 	rangeBb := rangeB
 
+	// call recursively on the left subrange
 	widgetA := layoutR(widgets, rangeAa, rangeAb)
+
+	// if the right subrange doesn't have any widgets, then just wrap the left and return
 	if rangeBa >= len(widgets) {
 		return widgetA
 	}
 
+	// call recursively on the right subrange
 	widgetB := layoutR(widgets, rangeBa, rangeBb)
+
+	// put both subranges in a SplitHorizontal and return
 	return []container.Option{
 		container.SplitHorizontal(
 			container.Top(widgetA...),
@@ -651,9 +686,17 @@ func layout(widgets Widgets) ([]container.Option, error) {
 	} else if len(widgets) == 1 {
 		return widgets[0], nil
 	}
-	return layoutR(widgets, 0, nextPower2(len(widgets))-1), nil
+
+	// define a range starting at 0 and ending with the length of the widget
+	// slice rounded up to a power of two
+	rangeA := 0
+	rangeB := nextPower2(len(widgets)) - 1
+
+	// kick off the recursive engine using defined widget slice and range
+	return layoutR(widgets, rangeA, rangeB), nil
 }
 
+// Execute a system command, returning a byte array of the output (both stdout and stderr)
 func commandWithContext(ctx context.Context, name string, arg ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, arg...)
 
@@ -730,8 +773,8 @@ func (this *PsProcess) String() string {
 	return fmt.Sprintf("%s,%d,%f,%f,%s\n", this.User, this.Pid, this.CpuPerc, this.MemPerc, this.Command)
 }
 
-func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
-	const numRowsShown int = 20
+// Create CPU and Memory top lists using output from a shared ps command execution.
+func topProcesses(ctx context.Context, config *PoptopConfig) ([]*PsProcess, []*PsProcess) {
 	procs, err := GetPsProcesses(ctx)
 	if err != nil {
 		panic(err)
@@ -741,14 +784,14 @@ func topProcesses(ctx context.Context) ([]*PsProcess, []*PsProcess) {
 		return procs[i].CpuPerc > procs[j].CpuPerc
 	})
 
-	procsByCpu := make([]*PsProcess, min(numRowsShown, len(procs)))
+	procsByCpu := make([]*PsProcess, min(config.TopRowsShown, len(procs)))
 	copy(procsByCpu, procs)
 
 	sort.Slice(procs, func(i, j int) bool {
 		return procs[i].MemPerc > procs[j].MemPerc
 	})
 
-	procsByMem := make([]*PsProcess, min(numRowsShown, len(procs)))
+	procsByMem := make([]*PsProcess, min(config.TopRowsShown, len(procs)))
 	copy(procsByMem, procs)
 
 	return procsByCpu, procsByMem
@@ -786,6 +829,9 @@ type PoptopConfig struct {
 
 	// If we receive any flags for specific widgets we switch into a mode where we only show the specificed widgets
 	SelectWidgetsMode bool
+
+	// Number of lines to print in the top processes / memory lists
+	TopRowsShown int
 }
 
 var cli struct {
@@ -805,7 +851,40 @@ var cli struct {
 
 const description string = "A modern top command that charts system metrics like CPU load, network IO, etc in the terminal."
 
-const helpContent string = `Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity.`
+const helpContent string = `"What's going on with my local system?". Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity. And make it look cool.
+
+# Metrics
+
+## CPU Load (1min, 5min, 15min)
+
+ Charts CPU load at 1, 5, 15min averages by calling sysctl.
+
+ Load is one of the simplest metrics for understanding how busy your system is. It means roughly how many processes are executing or waiting to execute on a CPU. If load is higher than the number of CPU cores on your system then it indicates processes are having to wait for execution.
+
+## CPU (%) (min, avg, max)
+
+ A chart to show min, average, max CPU busy % time. On MacOS this calls host_processor_info(). The judgement call here is that min, avg, max is a simpler way to understand CPU load rather than a single average, or charting per-CPU time.
+
+## Network IO (KiB/s) (send, recv)
+
+ Chart to show throughput on the selected network device in kibibytes per second using data from the netstat command. We automatically choose a network device based on which device has received the most inbound data since system start, changing dynamically if this this switches to a new device.
+
+## Disk IOPS (read, write)
+
+ Chart to show Disk IOPS (input/output operations per second) over time using data from iostat. Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database operations), then disk throughput may be a better metric. This chart currently shows only a single disk.
+
+## Disk IO (KiB/s) (read, write)
+
+ Chart to show disk IO throughput in kibibytes per second based on iostat output. This chart currently shows only a single disk.
+
+## Top CPU Processes (%, pid, command)
+
+ Show a list of top CPU processes output by the ps command, i.e. which processes are consuming the most CPU. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
+
+## Top Memory Processes (%, pid, command)
+
+ Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
+`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {
@@ -864,6 +943,7 @@ func DefaultConfig() *PoptopConfig {
 	return &PoptopConfig{
 		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS},
 		SelectWidgetsMode: false,
+		TopRowsShown:      25,
 	}
 }
 

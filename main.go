@@ -73,6 +73,15 @@ func nextPower2(i int) int {
 	return n
 }
 
+func power2(i int) int {
+	n := 0
+	for ; i != 0; n++ {
+		i = i >> 1
+	}
+
+	return n
+}
+
 // Recursively creates a layout by nesting widgets into SplitHorizontals.
 // We operate on a slice of Widgets (sized to be a power of two) and recursively
 // call on a specific range of this slice.
@@ -87,18 +96,15 @@ func nextPower2(i int) int {
 //   layoutR(widgets, 2, 3)
 //   layoutR(widgets, 4, 7)
 //   layoutR(widgets, 4, 5)
-func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
+func layoutR(widgets Widgets, rangeA, rangeB int, config *PoptopConfig) []container.Option {
 	if rangeA+1 == rangeB { // if the current range is two adjacent widgets
 		if rangeB >= len(widgets) { // if there's only a single widget in this range
 			// then wrap that widget and return
 			return widgets[rangeA]
 		}
 
-		// we have two widgets, so wrap in a SplitHorizontal and return
-		return []container.Option{
-			container.SplitHorizontal(
-				container.Top(widgets[rangeA]...),
-				container.Bottom(widgets[rangeB]...))}
+		// we have two widgets, so wrap split and return
+		return split(config, widgets[rangeA], widgets[rangeB], rangeA, rangeB)
 	}
 
 	// split the current range into two subranges on powers of two
@@ -109,7 +115,7 @@ func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
 	rangeBb := rangeB
 
 	// call recursively on the left subrange
-	widgetA := layoutR(widgets, rangeAa, rangeAb)
+	widgetA := layoutR(widgets, rangeAa, rangeAb, config)
 
 	// if the right subrange doesn't have any widgets, then just wrap the left and return
 	if rangeBa >= len(widgets) {
@@ -117,9 +123,30 @@ func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
 	}
 
 	// call recursively on the right subrange
-	widgetB := layoutR(widgets, rangeBa, rangeBb)
+	widgetB := layoutR(widgets, rangeBa, rangeBb, config)
 
-	// put both subranges in a SplitHorizontal and return
+	// put both subranges split and return
+	return split(config, widgetA, widgetB, rangeA, rangeB)
+}
+
+func split(config *PoptopConfig, widgetA, widgetB []container.Option, rangeA, rangeB int) []container.Option {
+	// boolean to switch from horizontal to vertical
+	// confusingly, if you want one widget on top of the other (i.e. "vertical"), you
+	// must use SplitHorizontal
+	horizontalSwitch := config.SplitHorizontally
+
+	// If we've switched on window tiling, then switch the tiling for every other power of 2
+	if config.TileWindows && power2(rangeB-rangeA)%2 == 1 {
+		horizontalSwitch = !horizontalSwitch
+	}
+
+	if horizontalSwitch {
+		return []container.Option{
+			container.SplitVertical(
+				container.Left(widgetA...),
+				container.Right(widgetB...))}
+	}
+
 	return []container.Option{
 		container.SplitHorizontal(
 			container.Top(widgetA...),
@@ -128,7 +155,7 @@ func layoutR(widgets Widgets, rangeA, rangeB int) []container.Option {
 
 // Takes an array of widgets as [][]container.Option and returns a termdash
 // layout based on configuration.
-func layout(widgets Widgets) ([]container.Option, error) {
+func layout(widgets Widgets, config *PoptopConfig) ([]container.Option, error) {
 	if len(widgets) == 0 {
 		return nil, fmt.Errorf("No widgets initialized, failing.")
 	} else if len(widgets) == 1 {
@@ -141,7 +168,7 @@ func layout(widgets Widgets) ([]container.Option, error) {
 	rangeB := nextPower2(len(widgets)) - 1
 
 	// kick off the recursive engine using defined widget slice and range
-	return layoutR(widgets, rangeA, rangeB), nil
+	return layoutR(widgets, rangeA, rangeB, config), nil
 }
 
 // Execute a system command, returning a byte array of the output (both stdout and stderr)
@@ -198,21 +225,29 @@ type PoptopConfig struct {
 
 	// Number of lines to print in the top processes / memory lists
 	TopRowsShown int
+
+	// Split into horizontal panes rather than vertical
+	SplitHorizontally bool
+
+	// Tile windows rather than put them all in a vertical or horizontal row
+	TileWindows bool
 }
 
 var cli struct {
-	Help           bool `short:"h" help:"Show help information"`
-	RedrawInterval int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
-	SampleInterval int  `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
-	ChartDuration  int  `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
-	Smooth         int  `short:"a" help:"How many samples will be included in running average" default:"4"`
-	CpuLoad        bool `short:"L" help:"Add CPU Load chart to layout" default:"false"`
-	CpuPercent     bool `short:"C" help:"Add CPU % chart to layout" default:"false"`
-	DiskIops       bool `short:"D" help:"Add Disk IOPS chart to layout" default:"false"`
-	DiskIo         bool `short:"E" help:"Add Disk IO chart to layout" default:"false"`
-	NetworkIo      bool `short:"N" help:"Add Network IO chart to layout" default:"false"`
-	TopCpu         bool `short:"T" help:"Add Top Processes by CPU list to layout" default:"false"`
-	TopMemory      bool `short:"M" help:"Add Top Processes by Memory list to layout" default:"false"`
+	Help            bool `short:"h" help:"Show help information"`
+	RedrawInterval  int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`
+	SampleInterval  int  `short:"s" help:"Sample interval in milliseconds (how often to fetch a new datapoint" default:"500"`
+	ChartDuration   int  `short:"d" help:"Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute" default:"120"`
+	SplitHorizontal bool `short:"z" help:"Arrange panes horizontally rather than vertically"`
+	TileWindows     bool `short:"w" help:"Tile windows rather than placing them in a horizontal or vertical line"`
+	Smooth          int  `short:"a" help:"How many samples will be included in running average" default:"4"`
+	CpuLoad         bool `short:"L" help:"Add CPU Load chart to layout" default:"false"`
+	CpuPercent      bool `short:"C" help:"Add CPU % chart to layout" default:"false"`
+	DiskIops        bool `short:"D" help:"Add Disk IOPS chart to layout" default:"false"`
+	DiskIo          bool `short:"E" help:"Add Disk IO chart to layout" default:"false"`
+	NetworkIo       bool `short:"N" help:"Add Network IO chart to layout" default:"false"`
+	TopCpu          bool `short:"T" help:"Add Top Processes by CPU list to layout" default:"false"`
+	TopMemory       bool `short:"M" help:"Add Top Processes by Memory list to layout" default:"false"`
 }
 
 const description string = "A modern top command that charts system metrics like CPU load, network IO, etc in the terminal."
@@ -250,6 +285,12 @@ const helpContent string = `"What's going on with my local system?". Poptop turn
 ## Top Memory Processes (%, pid, command)
 
  Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
+
+# Layout
+
+By default, all charts will be stacked vertically. You can use the -z flag to stack them horizontally instead.
+
+You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built.
 `
 
 func (this *PoptopConfig) selectWidget(widget int) {
@@ -274,6 +315,8 @@ func (this *PoptopConfig) ApplyFlags() error {
 
 	this.ChartDuration = time.Duration(cli.ChartDuration) * time.Second
 	this.SmoothingSamples = cli.Smooth
+	this.SplitHorizontally = cli.SplitHorizontal
+	this.TileWindows = cli.TileWindows
 
 	if cli.CpuLoad {
 		this.selectWidget(WidgetCPULoad)
@@ -361,7 +404,7 @@ func main() {
 		panic(err)
 	}
 
-	gridOpts, err := layout(w)
+	gridOpts, err := layout(w, config)
 	if err != nil {
 		panic(err)
 	}

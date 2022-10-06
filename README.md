@@ -5,8 +5,8 @@ A modern top command that charts system metrics like CPU load, network IO, etc i
 "What's going on with my local system?". Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity. And make it look cool.
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=sk_Xbdyac-g
-" target="_blank"><img src="http://img.youtube.com/vi/sk_Xbdyac-g/0.jpg" 
-alt="Video of Poptop" width="240" height="180" border="10" /></a>
+" target="_blank"><img src="https://github.com/bakks/poptop/raw/master/assets/screenshot.png" 
+alt="Video of Poptop" /></a>
 
 ## Metrics
 

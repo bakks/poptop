@@ -259,29 +259,8 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	return opts, nil
 }
 
-// Identify the network device with the most inbound data (since startup) based on iostat output
-func findNetworkDevice(iostat []net.IOCountersStat) net.IOCountersStat {
-	var maxBytesReceived uint64 = 0
-	var stat net.IOCountersStat
-
-	for _, st := range iostat {
-		if st.BytesRecv > maxBytesReceived {
-			maxBytesReceived = st.BytesRecv
-			stat = st
-		}
-	}
-
-	if maxBytesReceived == 0 {
-		panic(fmt.Sprintf("Could not find network device"))
-	}
-
-	return stat
-}
-
-// Chart to show throughput on the selected network device in kibibytes per second
+// Chart to show throughput on all network devices in kibibytes per second
 // using data from the netstat command.
-// We automatically choose a network device based on which device has received the most
-// inbound data since system start, changing dynamically if this this switches to a new device.
 func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
 	xLabels := formatLabels(config, func(n int) string {
 		x := float64(n) * float64(config.SampleInterval) / float64(time.Second)
@@ -293,31 +272,27 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		return nil, err
 	}
 
-	device := ""
-	var sent *BoundedSeries
-	var recv *BoundedSeries
 	var lastSent uint64
 	var lastRecv uint64
+	sent := NewBoundedSeries(config.NumSamples)
+	recv := NewBoundedSeries(config.NumSamples)
 
 	go periodic(ctx, config.SampleInterval, func() error {
 		iostats, err := net.IOCountersWithContext(ctx, true)
 		if err != nil {
 			return err
 		}
-		iostat := findNetworkDevice(iostats)
 
-		if iostat.Name != device {
-			// This happens at startup OR if a different network device has become the most active
-			nSamples := config.NumSamples
-			sent = NewBoundedSeries(nSamples)
-			recv = NewBoundedSeries(nSamples)
-			lastSent = 0
-			lastRecv = 0
-			device = iostat.Name
+		var bytesSent uint64
+		var bytesRecv uint64
+
+		for _, iostat := range iostats {
+			bytesSent += iostat.BytesSent
+			bytesRecv += iostat.BytesRecv
 		}
 
-		newSent := iostat.BytesSent * uint64(time.Second/config.SampleInterval) / 1024
-		newRecv := iostat.BytesRecv * uint64(time.Second/config.SampleInterval) / 1024
+		newSent := bytesSent * uint64(time.Second/config.SampleInterval) / 1024
+		newRecv := bytesRecv * uint64(time.Second/config.SampleInterval) / 1024
 
 		if lastSent != 0 {
 			sent.AddValue(float64(newSent - lastSent))
@@ -384,14 +359,12 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 			return err
 		}
 
-		// TODO logic for merging disk iostats
-		var iostat disk.IOCountersStat
+		var newRead uint64
+		var newWrite uint64
 		for _, v := range iostats {
-			iostat = v
+			newRead += v.ReadCount
+			newWrite += v.WriteCount
 		}
-
-		newRead := iostat.ReadCount
-		newWrite := iostat.WriteCount
 
 		if lastWrite != 0 {
 			write.AddValue(float64(newWrite-lastWrite) * float64(time.Second/config.SampleInterval))
@@ -455,13 +428,12 @@ func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Opti
 			return err
 		}
 
-		var iostat disk.IOCountersStat
+		var newRead uint64
+		var newWrite uint64
 		for _, v := range iostats {
-			iostat = v
+			newRead += v.ReadCount
+			newWrite += v.WriteCount
 		}
-
-		newRead := iostat.ReadBytes * uint64(time.Second/config.SampleInterval) / 1024
-		newWrite := iostat.WriteBytes * uint64(time.Second/config.SampleInterval) / 1024
 
 		if lastWrite != 0 {
 			write.AddValue(float64(newWrite - lastWrite))

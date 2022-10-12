@@ -268,7 +268,7 @@ const helpContent string = `"What's going on with my local system?". Poptop turn
 
 ## Network IO (KiB/s) (send, recv)
 
- Chart to show throughput on the selected network device in kibibytes per second using data from the netstat command. We automatically choose a network device based on which device has received the most inbound data since system start, changing dynamically if this this switches to a new device.
+ Chart to show throughput on all network devices in kibibytes per second using data from the netstat command.
 
 ## Disk IOPS (read, write)
 

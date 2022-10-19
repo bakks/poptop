@@ -8,7 +8,6 @@ import (
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/linestyle"
-	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/linechart"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -19,14 +18,25 @@ import (
 
 type Widgets [][]container.Option
 
-// newWidgets initializes widgets in the configured order and passes them back as []container.Option`s
-func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Container, config *PoptopConfig) (Widgets, error) {
+func newWidgetCache() map[int][]container.Option {
+	return map[int][]container.Option{}
+}
+
+// uses a cache to either initialize or retrieve widgets in the configured order and passes them back as []container.Option`s
+func getWidgets(ctx context.Context, config *PoptopConfig, cache map[int][]container.Option) (Widgets, error) {
 	var topCpu []container.Option
 	var topMem []container.Option
 	var err error
 	widgets := [][]container.Option{}
 
 	for _, widgetRef := range config.Widgets {
+
+		if existingWidget, ok := cache[widgetRef]; ok {
+			// if we've already initialized and cached this widget then use the existing object
+			widgets = append(widgets, existingWidget)
+			continue
+		}
+
 		var newWidget []container.Option
 
 		switch widgetRef {
@@ -46,15 +56,13 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 			newWidget, err = newDiskIOChart(ctx, config)
 
 		case WidgetTopCPU:
-			if topCpu == nil {
-				topCpu, topMem, err = newTopBoxes(ctx, config)
-			}
+			topCpu, topMem, err = newTopBoxes(ctx, config)
+			cache[WidgetTopMem] = topMem
 			newWidget = topCpu
 
 		case WidgetTopMem:
-			if topCpu == nil {
-				topCpu, topMem, err = newTopBoxes(ctx, config)
-			}
+			topCpu, topMem, err = newTopBoxes(ctx, config)
+			cache[WidgetTopCPU] = topCpu
 			newWidget = topMem
 		}
 
@@ -64,6 +72,9 @@ func newWidgets(ctx context.Context, t terminalapi.Terminal, c *container.Contai
 		if newWidget == nil {
 			panic(fmt.Sprintf("Failed to initialize widget %d", widgetRef))
 		}
+
+		cache[widgetRef] = newWidget
+
 		widgets = append(widgets, newWidget)
 	}
 

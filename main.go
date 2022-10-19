@@ -73,6 +73,7 @@ func nextPower2(i int) int {
 	return n
 }
 
+// returns the power of two that has been passed in, e.g. power2(8) = 3, power2(16) = 4
 func power2(i int) int {
 	n := 0
 	for ; i != 0; n++ {
@@ -80,6 +81,15 @@ func power2(i int) int {
 	}
 
 	return n
+}
+
+func find(slice []int, element int) int {
+	for i, x := range slice {
+		if x == element {
+			return i
+		}
+	}
+	return -1
 }
 
 // Recursively creates a layout by nesting widgets into SplitHorizontals.
@@ -199,6 +209,16 @@ const (
 	WidgetTopCPU
 	WidgetTopMem
 )
+
+var shortcodeToWidget map[rune]int = map[rune]int{
+	'L': WidgetCPULoad,
+	'C': WidgetCPUPerc,
+	'D': WidgetDiskIOPS,
+	'E': WidgetDiskIO,
+	'N': WidgetNetworkIO,
+	'T': WidgetTopCPU,
+	'M': WidgetTopMem,
+}
 
 type PoptopConfig struct {
 	// Which widgets (boxes of info) we want to display
@@ -360,8 +380,25 @@ func (this *PoptopConfig) Finalize() {
 	this.NumSamples = int(math.Ceil(float64(this.ChartDuration) / float64(this.SampleInterval)))
 }
 
+const rootID = "root"
+
+func applyLayout(ctx context.Context, rootContainer *container.Container, config *PoptopConfig, widgetCache map[int][]container.Option) {
+	w, err := getWidgets(ctx, config, widgetCache)
+	if err != nil {
+		panic(err)
+	}
+
+	gridOpts, err := layout(w, config)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := rootContainer.Update(rootID, gridOpts...); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
-	const rootID = "root"
 	var err error
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -393,33 +430,49 @@ func main() {
 		panic(err)
 	}
 
-	cont, err := container.New(terminal, container.ID(rootID))
+	rootContainer, err := container.New(terminal, container.ID(rootID))
 	if err != nil {
 		panic(err)
 	}
 
-	w, err := newWidgets(ctx, terminal, cont, config)
-	if err != nil {
-		panic(err)
-	}
+	widgetCache := newWidgetCache()
 
-	gridOpts, err := layout(w, config)
-	if err != nil {
-		panic(err)
-	}
+	applyLayout(ctx, rootContainer, config, widgetCache)
 
-	if err := cont.Update(rootID, gridOpts...); err != nil {
-		panic(err)
-	}
-
-	quitter := func(k *terminalapi.Keyboard) {
+	keyHandler := func(k *terminalapi.Keyboard) {
 		if k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC || k.Key == 'q' {
 			cancel()
 			terminal.Close()
 		}
+
+		// if the key is a layout-related flag then we want to manipulate the layout
+		if widgetRef, ok := shortcodeToWidget[rune(k.Key)]; ok {
+			index := find(config.Widgets, widgetRef)
+
+			// if the widget is being displayed then hide it, otherwise add it
+			if index != -1 {
+				// drop index from slice
+				config.Widgets = append(config.Widgets[:index], config.Widgets[index+1:]...)
+			} else {
+				config.Widgets = append(config.Widgets, widgetRef)
+			}
+
+			// we've edited the layout, now apply it
+			applyLayout(ctx, rootContainer, config, widgetCache)
+		}
+
+		if k.Key == 'z' {
+			config.SplitHorizontally = !config.SplitHorizontally
+			applyLayout(ctx, rootContainer, config, widgetCache)
+		}
+
+		if k.Key == 'w' {
+			config.TileWindows = !config.TileWindows
+			applyLayout(ctx, rootContainer, config, widgetCache)
+		}
 	}
 
-	err = termdash.Run(ctx, terminal, cont, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(config.RedrawInterval))
+	err = termdash.Run(ctx, terminal, rootContainer, termdash.KeyboardSubscriber(keyHandler), termdash.RedrawInterval(config.RedrawInterval))
 	if err != nil {
 		panic(err)
 	}

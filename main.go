@@ -378,7 +378,7 @@ func (this *PoptopConfig) ApplyFlags() error {
 
 func DefaultConfig() *PoptopConfig {
 	return &PoptopConfig{
-		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetNetworkIO, WidgetDiskIOPS},
+		Widgets:           []int{WidgetCPULoad, WidgetCPUPerc, WidgetDiskIOPS, WidgetTopCPU},
 		SelectWidgetsMode: false,
 		TopRowsShown:      25,
 	}

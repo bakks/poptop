@@ -8,6 +8,30 @@ A modern top command that charts system metrics like CPU load, network IO, etc i
 " target="_blank"><img src="https://github.com/bakks/poptop/raw/main/assets/screenshot.png" 
 alt="Video of Poptop" /></a>
 
+```
+Flags:
+  -h, --help                   Show help information
+  -r, --redraw-interval=500    Redraw interval in milliseconds (how often to repaint charts)
+  -s, --sample-interval=500    Sample interval in milliseconds (how often to fetch a new datapoint
+  -d, --chart-duration=120     Duration of the charted series in seconds (i.e. width of chart x-axis in time), 60 == 1 minute
+  -z, --split-horizontal       Arrange panes horizontally rather than vertically
+  -w, --tile-windows           Tile windows rather than placing them in a horizontal or vertical line
+  -a, --smooth=4               How many samples will be included in running average
+  -L, --cpu-load               Add CPU Load chart to layout
+  -C, --cpu-percent            Add CPU % chart to layout
+  -D, --disk-iops              Add Disk IOPS chart to layout
+  -E, --disk-io                Add Disk IO chart to layout
+  -N, --network-io             Add Network IO chart to layout
+  -T, --top-cpu                Add Top Processes by CPU list to layout
+  -M, --top-memory             Add Top Processes by Memory list to layout
+
+
+Examples:
+  poptop -CL -d 30        Show only CPU Load and % charts for 30 second duration.
+
+  poptop -w -LCDN         Show 4 specific charts arranged in a square.
+```
+
 ## Metrics
 
 ### CPU Load (1min, 5min, 15min)

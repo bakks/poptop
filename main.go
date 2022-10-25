@@ -272,7 +272,21 @@ var cli struct {
 
 const description string = "A modern top command that charts system metrics like CPU load, network IO, etc in the terminal."
 
-const helpContent string = `"What's going on with my local system?". Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity. And make it look cool.
+const helpContent string = `Examples:
+  poptop -CL -d 30        Show only CPU Load and % charts for 30 second duration.
+
+  poptop -w -LCDN         Show 4 specific charts arranged in a square.
+
+
+"What's going on with my local system?". Poptop turns your terminal into a dynamic charting tool for system metrics. While the top and htop commands show precise point-in-time data, Poptop aims to provide metrics over a time window to give a better at-a-glance summary of your system's activity. And make it look cool.
+
+# Layout
+
+Poptop displays some default charts, but also allows you to select your own. For example, 'poptop -LC' will display only CPU load and % charts. You can also add and remove charts at runtime by pressing the key corresponding to their flag (e.g. press C to toggle the CPU % chart).
+
+By default, all charts will be stacked vertically. You can use the -z flag to stack them horizontally instead.
+
+You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built. 'z' and 'w' can also be pressed at runtime to change the layout dynamically.
 
 # Metrics
 
@@ -305,12 +319,7 @@ const helpContent string = `"What's going on with my local system?". Poptop turn
 ## Top Memory Processes (%, pid, command)
 
  Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
-
-# Layout
-
-By default, all charts will be stacked vertically. You can use the -z flag to stack them horizontally instead.
-
-You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built.`
+`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {

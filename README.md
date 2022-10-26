@@ -71,3 +71,13 @@ Show a list of top CPU processes output by the ps command, i.e. which processes 
 ### Top Memory Processes (%, pid, command)
 
 Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
+
+## Acknowledgements
+
+Poptop is written in Golang and uses the following libraries:
+
+- [github.com/alecthomas/kong](github.com/alecthomas/kong)
+- [github.com/mum4k/termdash](github.com/mum4k/termdash) [(forked)](github.com/bakks/termdash)
+- [github.com/shirou/gopsutil/v3](github.com/shirou/gopsutil/v3)
+
+MIT License - Copyright (c) 2022 Peter Bakkum

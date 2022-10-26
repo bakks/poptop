@@ -318,7 +318,9 @@ You can also use the -w flag to arrange charts in a square, i.e. to switch betwe
 
 ## Top Memory Processes (%, pid, command)
 
- Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.`
+ Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
+
+MIT License - Copyright (c) 2022 Peter Bakkum`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {

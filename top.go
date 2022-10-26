@@ -54,10 +54,10 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		return nil
 	})
 
-	cpuTitle := cell.NewRichTextString(cell.ColorWhite).
+	cpuTitle := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" Top CPU Processes (%, pid, command) ")
 
-	memTitle := cell.NewRichTextString(cell.ColorWhite).
+	memTitle := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" Top Memory Processes (%, pid, command) ")
 
 	cpuOpts := makeContainer(cpuTextBox, cpuTitle)

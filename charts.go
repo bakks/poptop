@@ -103,11 +103,23 @@ func formatPercent(n float64) string {
 	return fmt.Sprintf("%.0f%%", n)
 }
 
+var (
+	ColorAxis         = cell.ColorNumber(52)
+	ColorChartLabel   = cell.ColorSilver
+	ColorWidgetBorder = cell.ColorGray
+	ColorWidgetTitle  = cell.ColorNumber(43)
+	ColorHot1         = cell.ColorNumber(197)
+	ColorHot2         = cell.ColorNumber(214)
+	ColorHot3         = cell.ColorNumber(39)
+	ColorRead         = ColorHot1
+	ColorWrite        = ColorHot3
+)
+
 func newLinechart(opts ...linechart.Option) (*linechart.LineChart, error) {
 	defaultOpts := []linechart.Option{
-		linechart.AxesCellOpts(cell.FgColor(cell.ColorGray)),
-		linechart.YLabelCellOpts(cell.FgColor(cell.ColorSilver)),
-		linechart.XLabelCellOpts(cell.FgColor(cell.ColorSilver)),
+		linechart.AxesCellOpts(cell.FgColor(ColorAxis)),
+		linechart.YLabelCellOpts(cell.FgColor(ColorChartLabel)),
+		linechart.XLabelCellOpts(cell.FgColor(ColorChartLabel)),
 	}
 	mergedOpts := append(defaultOpts, opts...)
 
@@ -116,10 +128,10 @@ func newLinechart(opts ...linechart.Option) (*linechart.LineChart, error) {
 
 func makeContainer(widget widgetapi.Widget, title *cell.RichTextString) []container.Option {
 	return []container.Option{container.Border(linestyle.Round),
-		container.BorderColor(cell.ColorGray),
-		container.FocusedColor(cell.ColorGray),
-		container.TitleColor(cell.ColorWhite),
-		container.TitleFocusedColor(cell.ColorWhite),
+		container.BorderColor(ColorWidgetBorder),
+		container.FocusedColor(ColorWidgetBorder),
+		container.TitleColor(ColorWidgetTitle),
+		container.TitleFocusedColor(ColorWidgetTitle),
 		container.RichBorderTitle(title),
 		container.PlaceWidget(widget)}
 }
@@ -158,35 +170,35 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 		load15.AddValue(loadAvg.Load15)
 
 		err = lc.Series("c_load1", load1.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot1)),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_load5", load5.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(93))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot2)),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("a_load15", load15.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(124))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot3)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
 	})
 
-	title := cell.NewRichTextString(cell.ColorWhite).
+	title := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" CPU Load (").
-		SetFgColor(cell.ColorNumber(87)).
+		SetFgColor(ColorHot1).
 		AddText("1min").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(93)).
+		SetFgColor(ColorHot2).
 		AddText("5min").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(124)).
+		SetFgColor(ColorHot3).
 		AddText("15min").
 		ResetColor().
 		AddText(") ")
@@ -230,37 +242,37 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		maxCpu.AddValue(minMax.max)
 
 		err = lc.Series("c_cpuAvg", avgCpu.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(202))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot2)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_cpuMax", maxCpu.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot1)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("a_cpuMin", minCpu.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorHot3)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
 	})
 
-	title := cell.NewRichTextString(cell.ColorWhite).
+	title := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" CPU (%) (").
-		SetFgColor(cell.ColorNumber(33)).
+		SetFgColor(ColorHot3).
 		AddText("min").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(202)).
+		SetFgColor(ColorHot2).
 		AddText("avg").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(196)).
+		SetFgColor(ColorHot1).
 		AddText("max").
 		ResetColor().
 		AddText(") ")
@@ -316,26 +328,26 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 		lastRecv = newRecv
 
 		err = lc.Series("c_sent", sent.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorWrite)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_recv", recv.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorRead)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
 	})
 
-	title := cell.NewRichTextString(cell.ColorWhite).
+	title := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" Network IO (KiB/s) (").
-		SetFgColor(cell.ColorNumber(196)).
+		SetFgColor(ColorWrite).
 		AddText("send").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(33)).
+		SetFgColor(ColorRead).
 		AddText("recv").
 		ResetColor().
 		AddText(") ")
@@ -388,26 +400,26 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 		lastRead = newRead
 
 		err = lc.Series("c_read", read.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorWrite)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_write", write.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorRead)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
 	})
 
-	title := cell.NewRichTextString(cell.ColorWhite).
+	title := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" Disk IOPS (").
-		SetFgColor(cell.ColorNumber(33)).
+		SetFgColor(ColorRead).
 		AddText("read").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(196)).
+		SetFgColor(ColorWrite).
 		AddText("write").
 		ResetColor().
 		AddText(") ")
@@ -457,26 +469,26 @@ func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Opti
 		lastRead = newRead
 
 		err = lc.Series("c_write", write.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(196))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorWrite)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_read", read.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))),
+			linechart.SeriesCellOpts(cell.FgColor(ColorRead)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err
 	})
 
-	title := cell.NewRichTextString(cell.ColorWhite).
+	title := cell.NewRichTextString(ColorWidgetTitle).
 		AddText(" Disk IO (KiB/s) (").
-		SetFgColor(cell.ColorNumber(33)).
+		SetFgColor(ColorRead).
 		AddText("read").
 		ResetColor().
 		AddText(", ").
-		SetFgColor(cell.ColorNumber(196)).
+		SetFgColor(ColorWrite).
 		AddText("write").
 		ResetColor().
 		AddText(") ")

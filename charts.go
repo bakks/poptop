@@ -400,14 +400,14 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 		lastRead = newRead
 
 		err = lc.Series("c_read", read.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(ColorWrite)),
+			linechart.SeriesCellOpts(cell.FgColor(ColorRead)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		if err != nil {
 			return err
 		}
 		err = lc.Series("b_write", write.SmoothedValues(config.SmoothingSamples),
-			linechart.SeriesCellOpts(cell.FgColor(ColorRead)),
+			linechart.SeriesCellOpts(cell.FgColor(ColorWrite)),
 			linechart.SeriesXLabels(xLabels),
 		)
 		return err

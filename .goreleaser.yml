@@ -1,11 +1,40 @@
 builds:
-  - binary: poptop
+  - id: darwin-amd64
+    main: ./
+    binary: poptop
     goos:
       - darwin
-      - linux
     goarch:
       - amd64
+    env:
+      - CGO_ENABLED=1
+      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
+      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
+      - CC=o64-clang
+      - CXX=o64-clang++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: darwin-arm64
+    main: ./
+    binary: poptop
+    goos:
+      - darwin
+    goarch:
       - arm64
+    env:
+      - CGO_ENABLED=1
+      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
+      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
+      - CC=o64-clang
+      - CXX=o64-clang++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
 
 release:
   prerelease: auto
@@ -17,6 +46,8 @@ brews:
   -
     name: poptop
     homepage: "https://github.com/bakks/poptop"
+    license: "MIT"
+    description: "A modern Top command that dynamically charts system metrics in the terminal."
     tap:
       owner: bakks
       name: homebrew-bakks

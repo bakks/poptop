@@ -13,9 +13,9 @@ builds:
       - CC=clang
       - CXX=clang++
     flags:
-      - -mod=readonly -Wunused-command-line-argument=0
+      - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X main.version={{.Version}} -Wunused-command-line-argument=0
 
   - id: darwin-arm64
     main: ./
@@ -31,9 +31,9 @@ builds:
       - CC=clang
       - CXX=clang++
     flags:
-      - -mod=readonly -Wunused-command-line-argument=0
+      - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X main.version={{.Version}} -Wunused-command-line-argument=0
 
 
 release:

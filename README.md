@@ -86,8 +86,8 @@ Show a list of top Memory processes output by the ps command, i.e. which process
 
 Poptop is written in Golang and uses the following libraries:
 
-- [github.com/alecthomas/kong](github.com/alecthomas/kong)
-- [github.com/mum4k/termdash](github.com/mum4k/termdash) [(forked)](github.com/bakks/termdash)
-- [github.com/shirou/gopsutil/v3](github.com/shirou/gopsutil/v3)
+- [github.com/alecthomas/kong](https://github.com/alecthomas/kong)
+- [github.com/mum4k/termdash](https://github.com/mum4k/termdash) [(forked)](https://github.com/bakks/termdash)
+- [github.com/shirou/gopsutil/v3](https://github.com/shirou/gopsutil/v3)
 
 MIT License - Copyright (c) 2022 Peter Bakkum

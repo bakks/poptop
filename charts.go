@@ -16,6 +16,18 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
+var (
+	ColorAxis         = cell.ColorNumber(52)
+	ColorChartLabel   = cell.ColorSilver
+	ColorWidgetBorder = cell.ColorGray
+	ColorWidgetTitle  = cell.ColorNumber(43)
+	ColorHot1         = cell.ColorNumber(197)
+	ColorHot2         = cell.ColorNumber(214)
+	ColorHot3         = cell.ColorNumber(39)
+	ColorRead         = ColorHot3
+	ColorWrite        = ColorHot1
+)
+
 type Widgets [][]container.Option
 
 func newWidgetCache() map[int][]container.Option {
@@ -102,18 +114,6 @@ func formatNoPoint(n float64) string {
 func formatPercent(n float64) string {
 	return fmt.Sprintf("%.0f%%", n)
 }
-
-var (
-	ColorAxis         = cell.ColorNumber(52)
-	ColorChartLabel   = cell.ColorSilver
-	ColorWidgetBorder = cell.ColorGray
-	ColorWidgetTitle  = cell.ColorNumber(43)
-	ColorHot1         = cell.ColorNumber(197)
-	ColorHot2         = cell.ColorNumber(214)
-	ColorHot3         = cell.ColorNumber(39)
-	ColorRead         = ColorHot1
-	ColorWrite        = ColorHot3
-)
 
 func newLinechart(opts ...linechart.Option) (*linechart.LineChart, error) {
 	defaultOpts := []linechart.Option{

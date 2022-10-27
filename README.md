@@ -11,8 +11,7 @@ A modern top command that charts system metrics like CPU load, network IO, etc i
 Poptop has only been built and tested on MacOS (amd64 and arm64). Install using Homebrew:
 
 ```
-brew tap bakks/bakks
-brew install poptop
+brew install bakks/bakks/poptop
 ```
 
 ## Operation

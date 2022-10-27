@@ -12,6 +12,7 @@ builds:
       - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
       - CC=clang
       - CXX=clang++
+      - 'CGO_CFLAGS=" -Wno-error=unused-command-line-argument "'
       - 'CGO_LDFLAGS=" -Wno-error=unused-command-line-argument "'
     flags:
       - -mod=readonly
@@ -31,6 +32,7 @@ builds:
       - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
       - CC=clang
       - CXX=clang++
+      - 'CGO_CFLAGS=" -Wno-error=unused-command-line-argument "'
       - 'CGO_LDFLAGS=" -Wno-error=unused-command-line-argument "'
     flags:
       - -mod=readonly

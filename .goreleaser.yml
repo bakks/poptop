@@ -13,7 +13,7 @@ builds:
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.arch={{.Arch}}
+      - -s -w -X main.BuildVersion={{.Tag}} -X main.BuildArch={{.Arch}} -X main.BuildCommit={{.ShortCommit}} -X main.BuildTimestamp={{.Date}} -X main.BuildOs={{.Os}}
 
   - id: darwin-arm64
     main: ./
@@ -29,7 +29,7 @@ builds:
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.arch={{.Arch}}
+      - -s -w -X main.BuildVersion={{.Tag}} -X main.BuildArch={{.Arch}} -X main.BuildCommit={{.ShortCommit}} -X main.BuildTimestamp={{.Date}} -X main.BuildOs={{.Os}}
 
 
 release:

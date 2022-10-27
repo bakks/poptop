@@ -17,6 +17,20 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 )
 
+const License = "MIT License - Copyright (c) 2022 Peter Bakkum"
+
+var ( // these are filled in at build time
+	BuildVersion   string
+	BuildArch      string
+	BuildCommit    string
+	BuildOs        string
+	BuildTimestamp string
+)
+
+func getBuildInfo() string {
+	return fmt.Sprintf("Poptop %s %s %s (commit %s) (built %s)\n%s\n", BuildVersion, BuildOs, BuildArch, BuildCommit, BuildTimestamp, License)
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -318,9 +332,7 @@ You can also use the -w flag to arrange charts in a square, i.e. to switch betwe
 
 ## Top Memory Processes (%, pid, command)
 
- Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.
-
-MIT License - Copyright (c) 2022 Peter Bakkum`
+ Show a list of top Memory processes output by the ps command, i.e. which processes are consuming the most real memory. This is sampled at one-fourth of the sample interval rate since this is a point-in-time list rather than a chart. Run 'man ps' for more information on calculation methodology.`
 
 func (this *PoptopConfig) selectWidget(widget int) {
 	if !this.SelectWidgetsMode {
@@ -417,8 +429,7 @@ func main() {
 
 	if cli.Help {
 		kong.DefaultHelpPrinter(kong.HelpOptions{}, kongCtx)
-		fmt.Printf("\n\n")
-		fmt.Println(helpContent)
+		fmt.Printf("\n\n%s\n\n%s", helpContent, getBuildInfo())
 		os.Exit(0)
 	}
 

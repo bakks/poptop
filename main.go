@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -507,7 +508,8 @@ func periodic(ctx context.Context, interval time.Duration, fn func() error) {
 	for {
 		select {
 		case <-ticker.C:
-			if err := fn(); err != nil {
+			err := fn()
+			if err != nil && !errors.Is(err, context.Canceled) {
 				panic(err)
 			}
 		case <-ctx.Done():

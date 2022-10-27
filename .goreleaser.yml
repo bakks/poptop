@@ -1,0 +1,28 @@
+builds:
+  - binary: poptop
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+release:
+  prerelease: auto
+
+universal_binaries:
+  - replace: true
+
+brews:
+  -
+    name: poptop
+    homepage: "https://github.com/bakks/poptop"
+    tap:
+      owner: bakks
+      name: homebrew-bakks
+    commit_author:
+      name: bakks
+      email: pbbakkum@gmail.com
+
+checksum:
+  name_template: 'checksums.txt'

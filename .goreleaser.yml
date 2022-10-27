@@ -15,7 +15,7 @@ builds:
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -Wunused-command-line-argument=0
+      - -s -w -X main.version={{.Version}} -Wno-error=unused-command-line-argument
 
   - id: darwin-arm64
     main: ./
@@ -33,7 +33,7 @@ builds:
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -Wunused-command-line-argument=0
+      - -s -w -X main.version={{.Version}} -Wno-error=unused-command-line-argument
 
 
 release:

@@ -8,16 +8,12 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
-      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
-      - CC=clang
-      - CXX=clang++
-      - 'CGO_CFLAGS=" -Wno-error=unused-command-line-argument "'
-      - 'CGO_LDFLAGS=" -Wno-error=unused-command-line-argument "'
+      - CC=o64-clang
+      - CXX=o64-clang++
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -Wno-error=unused-command-line-argument
+      - -s -w -X main.version={{.Version}} -X main.arch={{.Arch}}
 
   - id: darwin-arm64
     main: ./
@@ -28,16 +24,12 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=1
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
-      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
-      - CC=clang
-      - CXX=clang++
-      - 'CGO_CFLAGS=" -Wno-error=unused-command-line-argument "'
-      - 'CGO_LDFLAGS=" -Wno-error=unused-command-line-argument "'
+      - CC=o64-clang
+      - CXX=o64-clang++
     flags:
       - -mod=readonly
     ldflags:
-      - -s -w -X main.version={{.Version}} -Wno-error=unused-command-line-argument
+      - -s -w -X main.version={{.Version}} -X main.arch={{.Arch}}
 
 
 release:

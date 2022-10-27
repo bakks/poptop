@@ -2,18 +2,17 @@ name: goreleaser
 
 on:
   push:
-    # run only against tags
     tags:
-      - '*'
+      - 'v*'
 
 permissions:
   contents: write
-  # packages: write
-  # issues: write
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    container:
+      image: goreleaser/goreleaser-cross
     steps:
       - uses: actions/checkout@v3
         with:

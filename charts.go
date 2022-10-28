@@ -189,6 +189,7 @@ func newLoadChart(ctx context.Context, config *PoptopConfig) ([]container.Option
 	})
 
 	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
 		AddText(" CPU Load (").
 		SetFgColor(ColorHot1).
 		AddText("1min").
@@ -263,6 +264,7 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	})
 
 	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
 		AddText(" CPU (%) (").
 		SetFgColor(ColorHot3).
 		AddText("min").
@@ -342,6 +344,7 @@ func newNetChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	})
 
 	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
 		AddText(" Network IO (KiB/s) (").
 		SetFgColor(ColorWrite).
 		AddText("send").
@@ -414,6 +417,7 @@ func newDiskIOPSChart(ctx context.Context, config *PoptopConfig) ([]container.Op
 	})
 
 	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
 		AddText(" Disk IOPS (").
 		SetFgColor(ColorRead).
 		AddText("read").
@@ -483,6 +487,7 @@ func newDiskIOChart(ctx context.Context, config *PoptopConfig) ([]container.Opti
 	})
 
 	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
 		AddText(" Disk IO (KiB/s) (").
 		SetFgColor(ColorRead).
 		AddText("read").

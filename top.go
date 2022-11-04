@@ -76,6 +76,12 @@ type PsProcess struct {
 	Command string
 }
 
+func parsePerc(field string) (float64, error) {
+	// In some locales the ps output uses a `,` rather than a `.`
+	cleanField := strings.Replace(field, ",", ".", 64)
+	return strconv.ParseFloat(cleanField, 64)
+}
+
 func GetPsProcesses(ctx context.Context) ([]*PsProcess, error) {
 	args := []string{"auxc"}
 	out, err := commandWithContext(ctx, "ps", args...)
@@ -98,12 +104,12 @@ func GetPsProcesses(ctx context.Context) ([]*PsProcess, error) {
 			return nil, err
 		}
 
-		cpuPerc, err := strconv.ParseFloat(fields[2], 64)
+		cpuPerc, err := parsePerc(fields[2])
 		if err != nil {
 			return nil, err
 		}
 
-		memPerc, err := strconv.ParseFloat(fields[3], 64)
+		memPerc, err := parsePerc(fields[3])
 		if err != nil {
 			return nil, err
 		}

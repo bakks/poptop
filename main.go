@@ -12,10 +12,13 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/mum4k/termdash"
+	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/keyboard"
+	"github.com/mum4k/termdash/linestyle"
 	"github.com/mum4k/termdash/terminal/termbox"
 	"github.com/mum4k/termdash/terminal/terminalapi"
+	"github.com/mum4k/termdash/widgets/text"
 )
 
 const License = "MIT License - Copyright (c) 2022 Peter Bakkum"
@@ -107,6 +110,34 @@ func find(slice []int, element int) int {
 	return -1
 }
 
+func newHelpBox(ctx context.Context, config *PoptopConfig) ([]container.Option, error) {
+	textBox, err := text.New()
+	if err != nil {
+		return nil, err
+	}
+
+	title := cell.NewRichTextString(ColorWidgetTitle).
+		AddOpt(cell.Bold()).
+		AddText(" Poptop Hotkeys ")
+
+	helpText := ` h  Toggle help widget (shown here)
+ q  Quit Poptop
+ L  Toggle CPU Load widget
+ C  Toggle CPU Percent widget
+ D  Toggle Disk IOPS widget
+ E  Toggle Disk Throughput widget
+ N  Toggle Network Throughput widget
+ T  Toggle Top CPU Processes widget
+ M  Toggle Top Memory Processes widget
+ z  Toggle horizontal vs vertical alignment
+ w  Toggle row of widgets vs panes of widgets`
+
+	opts := makeContainer(textBox, title)
+	textBox.Write(helpText, text.WriteReplace())
+
+	return opts, nil
+}
+
 // Recursively creates a layout by nesting widgets into SplitHorizontals.
 // We operate on a slice of Widgets (sized to be a power of two) and recursively
 // call on a specific range of this slice.
@@ -193,7 +224,13 @@ func layout(widgets Widgets, config *PoptopConfig) ([]container.Option, error) {
 	rangeB := nextPower2(len(widgets)) - 1
 
 	// kick off the recursive engine using defined widget slice and range
-	return layoutR(widgets, rangeA, rangeB, config), nil
+	opts := layoutR(widgets, rangeA, rangeB, config)
+
+	// we need to explicitly clear the border because it could have been left
+	// behind by a past single-widget configuration
+	opts = append(opts, container.Border(linestyle.None))
+
+	return opts, nil
 }
 
 // Execute a system command, returning a byte array of the output (both stdout and stderr)
@@ -223,6 +260,7 @@ const (
 	WidgetDiskIO
 	WidgetTopCPU
 	WidgetTopMem
+	WidgetHelp
 )
 
 var shortcodeToWidget map[rune]int = map[rune]int{
@@ -233,6 +271,8 @@ var shortcodeToWidget map[rune]int = map[rune]int{
 	'N': WidgetNetworkIO,
 	'T': WidgetTopCPU,
 	'M': WidgetTopMem,
+	'h': WidgetHelp,
+	'H': WidgetHelp,
 }
 
 type PoptopConfig struct {
@@ -387,6 +427,7 @@ func (this *PoptopConfig) ApplyFlags() error {
 	if cli.TopMemory {
 		this.selectWidget(WidgetTopMem)
 	}
+
 	return nil
 }
 
@@ -475,6 +516,11 @@ func main() {
 			if index != -1 {
 				// drop index from slice
 				config.Widgets = append(config.Widgets[:index], config.Widgets[index+1:]...)
+
+				// if we've removed all widgets then show the help widget
+				if len(config.Widgets) == 0 {
+					config.Widgets = append(config.Widgets, WidgetHelp)
+				}
 			} else {
 				config.Widgets = append(config.Widgets, widgetRef)
 			}

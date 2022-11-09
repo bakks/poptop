@@ -52,6 +52,9 @@ func getWidgets(ctx context.Context, config *PoptopConfig, cache map[int][]conta
 		var newWidget []container.Option
 
 		switch widgetRef {
+		case WidgetHelp:
+			newWidget, err = newHelpBox(ctx, config)
+
 		case WidgetCPULoad:
 			newWidget, err = newLoadChart(ctx, config)
 

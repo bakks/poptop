@@ -50,6 +50,24 @@ By default, all charts will be stacked vertically. You can use the -z flag to st
 
 You can also use the -w flag to arrange charts in a square, i.e. to switch between vertical and horizontal stacking as the layout is built. 'z' and 'w' can also be pressed at runtime to change the layout dynamically.
 
+## Hotkeys
+
+The following hotkeys are available while Poptopt is running. Note that the keys are mostly the same as the command line options.
+
+```
+ h  Toggle help widget
+ q  Quit Poptop
+ L  Toggle CPU Load widget
+ C  Toggle CPU Percent widget
+ D  Toggle Disk IOPS widget
+ E  Toggle Disk Throughput widget
+ N  Toggle Network Throughput widget
+ T  Toggle Top CPU Processes widget
+ M  Toggle Top Memory Processes widget
+ z  Toggle horizontal vs vertical alignment
+ w  Toggle row of widgets vs panes of widgets
+```
+
 ## Metrics
 
 ### CPU Load (1min, 5min, 15min)
@@ -62,13 +80,15 @@ Load is one of the simplest metrics for understanding how busy your system is. I
 
 A chart to show min, average, max CPU busy % time. On MacOS this calls `host_processor_info()`. The judgement call here is that min, avg, max is a simpler way to understand CPU load rather than a single average, or charting per-CPU time.
 
+CPU time here means the total time minus CPU idle time and IO wait time.
+
 ### Network IO (KiB/s) (send, recv)
 
 Chart to show throughput on the selected network device in kibibytes per second using data from the netstat command. We automatically choose a network device based on which device has received the most inbound data since system start, changing dynamically if this this switches to a new device.
 
 ### Disk IOPS (read, write)
 
-Chart to show Disk IOPS (input/output operations per second) over time using data from iostat. Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database operations), then disk throughput may be a better metric. This chart currently shows only a single disk.
+Chart to show Disk IOPS (input/output operations per second) over time using data from iostat. Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database operations), then disk throughput may be a better metric.
 
 ### Disk IO (KiB/s) (read, write)
 

@@ -234,7 +234,7 @@ func newCpuChart(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	maxCpu := NewBoundedSeries(nSamples)
 
 	go periodic(ctx, config.SampleInterval, func() error {
-		cpuAllPerc, err := cpu.PercentWithContext(ctx, config.SampleInterval, true)
+		cpuAllPerc, err := cpu.PercentWithContext(ctx, 0, true)
 		if err != nil {
 			return err
 		}

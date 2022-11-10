@@ -355,13 +355,15 @@ You can also use the -w flag to arrange charts in a square, i.e. to switch betwe
 
  A chart to show min, average, max CPU busy % time. On MacOS this calls host_processor_info(). The judgement call here is that min, avg, max is a simpler way to understand CPU load rather than a single average, or charting per-CPU time.
 
+ CPU time here means the total time minus CPU idle time and IO wait time.
+
 ## Network IO (KiB/s) (send, recv)
 
  Chart to show throughput on all network devices in kibibytes per second using data from the netstat command.
 
 ## Disk IOPS (read, write)
 
- Chart to show Disk IOPS (input/output operations per second) over time using data from iostat. Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database operations), then disk throughput may be a better metric. This chart currently shows only a single disk.
+ Chart to show Disk IOPS (input/output operations per second) over time using data from iostat. Arguably, in an everyday scenario with many heavy processes then IOPS is a simpler metric than throughput, but if disk load is skewed to a specific process (e.g. heavy file copies, database operations), then disk throughput may be a better metric.
 
 ## Disk IO (KiB/s) (read, write)
 

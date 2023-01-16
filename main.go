@@ -308,6 +308,7 @@ type PoptopConfig struct {
 	TileWindows bool
 }
 
+// Kong CLI parser option configuration
 var cli struct {
 	Help            bool `short:"h" help:"Show help information"`
 	RedrawInterval  int  `short:"r" help:"Redraw interval in milliseconds (how often to repaint charts)" default:"500"`

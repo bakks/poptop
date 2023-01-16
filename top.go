@@ -28,7 +28,7 @@ func newTopBoxes(ctx context.Context, config *PoptopConfig) ([]container.Option,
 	interval := config.SampleInterval * 4
 
 	go periodic(ctx, interval, func() error {
-		topCpu, topMem := topProcesses(ctx, config)
+		topCpu, topMem, err := topProcesses(ctx, config)
 		if err != nil {
 			return err
 		}
@@ -133,10 +133,10 @@ func (this *PsProcess) String() string {
 }
 
 // Create CPU and Memory top lists using output from a shared ps command execution.
-func topProcesses(ctx context.Context, config *PoptopConfig) ([]*PsProcess, []*PsProcess) {
+func topProcesses(ctx context.Context, config *PoptopConfig) ([]*PsProcess, []*PsProcess, error) {
 	procs, err := GetPsProcesses(ctx)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
 	sort.Slice(procs, func(i, j int) bool {
@@ -153,5 +153,5 @@ func topProcesses(ctx context.Context, config *PoptopConfig) ([]*PsProcess, []*P
 	procsByMem := make([]*PsProcess, min(config.TopRowsShown, len(procs)))
 	copy(procsByMem, procs)
 
-	return procsByCpu, procsByMem
+	return procsByCpu, procsByMem, nil
 }
